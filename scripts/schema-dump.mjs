@@ -10,10 +10,10 @@
 
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const root = process.argv[2] ?? process.cwd();
+const root = resolve(process.argv[2] ?? process.cwd());
 
 // Import the site's Vite, not one next to this script.
 const require = createRequire(join(root, 'package.json'));
@@ -38,12 +38,56 @@ const fields = Object.fromEntries(Object.entries(realFields).map(([n, make]) =>
   },
 };
 
+// Astro's content schema holds rules Keystatic can't express, like "a post
+// has one kind" (a list capped at one). Load it with a stand-in for the
+// astro:content module so its zod schemas can be read.
+const astroContent = {
+  name: 'astro-content-stub',
+  enforce: 'pre',
+  resolveId(id) {
+    if (id === 'astro:content') return '\0astro-content-stub';
+  },
+  load(id) {
+    if (id === '\0astro-content-stub') return `export { z } from 'astro/zod'; export const defineCollection = (c) => c;`;
+  },
+};
+
 const vite = await createServer({
   root, configFile: false, logLevel: 'silent', server: { middlewareMode: true }, appType: 'custom',
-  optimizeDeps: { noDiscovery: true, include: [] }, plugins: [tagFields],
+  optimizeDeps: { noDiscovery: true, include: [] }, plugins: [tagFields, astroContent],
 });
 const { default: cfg } = await vite.ssrLoadModule('/keystatic.config.ts');
+let astroCollections = {};
+try {
+  astroCollections = (await vite.ssrLoadModule('/src/content/config.ts')).collections ?? {};
+} catch {
+  // No Astro schema, or one this can't load: Keystatic's rules still apply.
+}
 await vite.close();
+
+// The zod object behind a collection, past .refine() and friends.
+function zodShape(schema) {
+  let s = schema;
+  while (s?._def?.schema || s?._def?.innerType) s = s._def.schema ?? s._def.innerType;
+  return typeof s?.shape === 'function' ? s.shape() : s?.shape;
+}
+
+// Limits per Astro collection and field: { posts: { categories: { maxItems: 1 } } }.
+const limits = {};
+for (const [name, collection] of Object.entries(astroCollections)) {
+  const shape = zodShape(collection?.schema);
+  if (!shape) continue;
+  for (const [key, field] of Object.entries(shape)) {
+    let f = field;
+    while (f?._def?.innerType) f = f._def.innerType;
+    const max = f?._def?.maxLength?.value;
+    if (f?._def?.typeName === 'ZodArray' && max != null) (limits[name] ??= {})[key] = { maxItems: max };
+  }
+}
+
+// A Keystatic path (src/content/episodes/corrixeme/*) names its Astro
+// collection by the folder after src/content/.
+const astroName = (path) => path.match(/^src\/content\/([^/*]+)/)?.[1];
 
 // JSON objects lose their order in most decoders, and a form needs it, so
 // every map of fields becomes a list with the key inside.
@@ -64,11 +108,14 @@ function field(f) {
   return out;
 }
 
-const item = (kind) => (c) => ({
-  kind, label: c.label, path: c.path, format: c.format ?? 'yaml',
-  slugField: c.slugField, previewUrl: c.previewUrl, columns: c.columns,
-  fields: list(c.schema, field),
-});
+const item = (kind) => (c) => {
+  const extra = limits[astroName(c.path)] ?? {};
+  return {
+    kind, label: c.label, path: c.path, format: c.format ?? 'yaml',
+    slugField: c.slugField, previewUrl: c.previewUrl, columns: c.columns,
+    fields: list(c.schema, field).map((f) => ({ ...f, ...extra[f.key] })),
+  };
+};
 
 console.log(JSON.stringify({
   navigation: cfg.ui?.navigation ? Object.entries(cfg.ui.navigation).map(([name, keys]) => ({ name, keys })) : null,

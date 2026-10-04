@@ -53,6 +53,8 @@ struct FieldControl: View {
             }
         case "select":
             SelectField(spec: spec, value: $value)
+        case "multiselect" where spec.maxItems == 1:
+            SingleChoiceListField(spec: spec, value: $value)
         case "multiselect":
             MultiSelectField(spec: spec, value: $value)
         case "date", "datetime":
@@ -126,6 +128,31 @@ struct SelectField: View {
         let current = value.string ?? ""
         Picker(spec.title, selection: Binding(get: { current }, set: { value = .string($0) })) {
             if !options.contains(where: { $0.value == current }) {
+                Text(current.isEmpty ? "None" : current).tag(current)
+            }
+            ForEach(options, id: \.value) { option in
+                Text(option.label).tag(option.value)
+            }
+        }
+        .labelsHidden()
+        .fixedSize()
+    }
+}
+
+/// A list capped at one item, shown as a menu. It still saves as a list
+/// (`[posts]`), which is what the site reads.
+struct SingleChoiceListField: View {
+    let spec: FieldSpec
+    @Binding var value: FieldValue
+
+    var body: some View {
+        let options = spec.options ?? []
+        let current = value.array?.first?.string ?? ""
+        Picker(spec.title, selection: Binding(
+            get: { current },
+            set: { value = .array($0.isEmpty ? [] : [.string($0)]) }
+        )) {
+            if current.isEmpty || !options.contains(where: { $0.value == current }) {
                 Text(current.isEmpty ? "None" : current).tag(current)
             }
             ForEach(options, id: \.value) { option in

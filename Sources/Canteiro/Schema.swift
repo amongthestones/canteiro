@@ -151,6 +151,8 @@ final class FieldSpec: Decodable, Sendable, Identifiable {
     let collection: String?
     let extensionName: String?
     let slug: SubLabel?
+    /// A list's cap from the site's Astro schema (a post has one kind).
+    let maxItems: Int?
 
     var id: String { key }
     /// Keystatic's conditional has no label of its own; its menu has one.
@@ -158,7 +160,7 @@ final class FieldSpec: Decodable, Sendable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case key, type, label, description, multiline, options, validation, fields, element
-        case discriminant, values, collection, slug
+        case discriminant, values, collection, slug, maxItems
         case extensionName = "extension"
     }
 
@@ -180,6 +182,7 @@ final class FieldSpec: Decodable, Sendable, Identifiable {
         collection = try c.decodeIfPresent(String.self, forKey: .collection)
         extensionName = try c.decodeIfPresent(String.self, forKey: .extensionName)
         slug = try? c.decodeIfPresent(SubLabel.self, forKey: .slug)
+        maxItems = try c.decodeIfPresent(Int.self, forKey: .maxItems)
     }
 
     var maxLength: Int? { validation?.length?.max }
