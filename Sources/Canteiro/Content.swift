@@ -11,6 +11,9 @@ struct Entry: Sendable, Identifiable, Hashable {
     var data: FieldValue
     /// The text after the frontmatter, for entries with a body.
     var body: String?
+    /// The whole file as read. A save checks the file still says this, so
+    /// a change made elsewhere (iA Writer, git) is never written over.
+    var raw: String
 
     static func == (a: Entry, b: Entry) -> Bool { a.id == b.id && a.data == b.data && a.body == b.body }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
@@ -67,9 +70,9 @@ enum ContentLoader {
             let text = try String(contentsOf: url, encoding: .utf8)
             if hasBody {
                 let parts = YAMLReader.splitFrontmatter(text)
-                return Entry(id: id, slug: slug, url: url, data: try YAMLReader.parse(parts.yaml), body: parts.body)
+                return Entry(id: id, slug: slug, url: url, data: try YAMLReader.parse(parts.yaml), body: parts.body, raw: text)
             }
-            return Entry(id: id, slug: slug, url: url, data: try YAMLReader.parse(text), body: nil)
+            return Entry(id: id, slug: slug, url: url, data: try YAMLReader.parse(text), body: nil, raw: text)
         } catch {
             throw Failure.unreadable(id, error.localizedDescription)
         }

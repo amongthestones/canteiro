@@ -34,7 +34,8 @@ struct CollectionView: View {
 
             Group {
                 if let id = store.selectedEntry[item.key], let entry = store.entries[item.key]?.first(where: { $0.id == id }) {
-                    EntryEditor(item: item, entry: entry).id(entry.id)
+                    EntryEditor(item: item, entry: entry)
+                        .id("\(entry.id)#\(store.revisions[entry.id] ?? 0)")
                 } else {
                     ContentUnavailableView("No Entry Selected", systemImage: SidebarView.icon(for: item))
                 }
@@ -109,6 +110,7 @@ struct SingletonView: View {
         Group {
             if let entry = store.singletons[item.key] {
                 SingletonEditor(item: item, entry: entry)
+                    .id("\(entry.id)#\(store.revisions[entry.id] ?? 0)")
             } else {
                 ContentUnavailableView("Not Made Yet", systemImage: "doc.badge.plus",
                                        description: Text("\(item.path).\(item.fileExtension) doesn't exist yet."))
@@ -118,7 +120,7 @@ struct SingletonView: View {
     }
 }
 
-/// A singleton's settings, edited in memory for now (saving comes next).
+/// A singleton's settings. Edits save themselves (see Autosave).
 struct SingletonEditor: View {
     let item: SchemaItem
     let entry: Entry
@@ -132,6 +134,7 @@ struct SingletonEditor: View {
 
     var body: some View {
         SettingsForm(fields: item.dataFields, data: $data)
+            .autosave(item, id: entry.id, data: data, body: nil)
     }
 }
 

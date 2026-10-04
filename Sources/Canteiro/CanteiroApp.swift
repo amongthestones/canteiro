@@ -15,6 +15,7 @@ struct CanteiroApp: App {
         }
         .defaultSize(width: 1280, height: 820)
         .commands {
+            SaveCommand()
             CommandGroup(replacing: .newItem) {
                 Button("Open Site…") { store.chooseSite() }
                     .keyboardShortcut("o")

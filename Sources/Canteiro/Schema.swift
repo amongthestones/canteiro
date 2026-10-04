@@ -97,6 +97,11 @@ struct Format: Decodable, Sendable {
     var data = "yaml"
     var contentField: String?
 
+    init(data: String = "yaml", contentField: String? = nil) {
+        self.data = data
+        self.contentField = contentField
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         if let name = try? container.decode(String.self) {

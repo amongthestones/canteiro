@@ -21,6 +21,13 @@ final class SiteStore {
     /// Files that didn't parse. Shown, not hidden: a broken file is worth knowing about.
     private(set) var problems: [String] = []
 
+    /// Entries whose file changed on disk since they were read. A save
+    /// stops and asks rather than write over the other change.
+    private(set) var conflicts: Set<Entry.ID> = []
+    private(set) var saveErrors: [Entry.ID: String] = [:]
+    /// Bumped when an entry is reread from disk, so its editor starts over.
+    private(set) var revisions: [Entry.ID: Int] = [:]
+
     var selectedItem: String?
     var selectedEntry: [String: Entry.ID] = [:]
 
@@ -122,6 +129,57 @@ final class SiteStore {
             return text.replacingOccurrences(of: "\n", with: " ")
         }
         return entry.slug
+    }
+
+    // MARK: Saving
+
+    /// The entry as the store has it now (after any earlier save).
+    func current(_ item: SchemaItem, id: Entry.ID) -> Entry? {
+        item.kind == .singleton ? singletons[item.key] : entries[item.key]?.first { $0.id == id }
+    }
+
+    /// Writes the edits to the entry's file. Does nothing when nothing
+    /// changed, and stops when the file changed on disk since it was read,
+    /// unless `overwrite` says to write over it.
+    func save(_ item: SchemaItem, id: Entry.ID, data: FieldValue, body: String?, overwrite: Bool = false) {
+        guard let siteURL, let entry = current(item, id: id) else { return }
+        guard let text = FileWriter.text(for: entry, data: data, body: body, format: item.format) else { return }
+        let onDisk = try? String(contentsOf: entry.url, encoding: .utf8)
+        if onDisk != entry.raw && !overwrite {
+            conflicts.insert(id)
+            return
+        }
+        do {
+            try text.write(to: entry.url, atomically: true, encoding: .utf8)
+            let saved = try ContentLoader.read(entry.url, slug: entry.slug, site: siteURL, hasBody: item.format.contentField != nil)
+            replace(saved, in: item)
+            conflicts.remove(id)
+            saveErrors[id] = nil
+        } catch {
+            saveErrors[id] = error.localizedDescription
+        }
+    }
+
+    /// Drops the edits and rereads the file from disk.
+    func reread(_ item: SchemaItem, id: Entry.ID) {
+        guard let siteURL, let entry = current(item, id: id) else { return }
+        do {
+            let fresh = try ContentLoader.read(entry.url, slug: entry.slug, site: siteURL, hasBody: item.format.contentField != nil)
+            replace(fresh, in: item)
+            conflicts.remove(id)
+            saveErrors[id] = nil
+            revisions[id, default: 0] += 1
+        } catch {
+            saveErrors[id] = error.localizedDescription
+        }
+    }
+
+    private func replace(_ entry: Entry, in item: SchemaItem) {
+        if item.kind == .singleton {
+            singletons[item.key] = entry
+        } else if let index = entries[item.key]?.firstIndex(where: { $0.id == entry.id }) {
+            entries[item.key]?[index] = entry
+        }
     }
 
     func count(_ item: SchemaItem) -> Int? {

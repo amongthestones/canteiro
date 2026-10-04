@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// One entry's form, built from its schema, with the body under it.
-/// Edits stay in memory for now: saving comes next.
+/// One entry's form, built from its schema, with the body under it. Edits
+/// save themselves (see Autosave).
 struct EntryEditor: View {
     let item: SchemaItem
     let entry: Entry
@@ -33,8 +33,6 @@ struct EntryEditor: View {
         return (main, fields.filter { !mainKeys.contains($0.key) })
     }
 
-    private var isEdited: Bool { data != entry.data || text != (entry.body ?? "") }
-
     var body: some View {
         let split = split
         ScrollView {
@@ -60,14 +58,7 @@ struct EntryEditor: View {
             .frame(maxWidth: 820, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .toolbar {
-            if isEdited {
-                ToolbarItem {
-                    Label("Edited", systemImage: "pencil.circle")
-                        .help("Edited here. Saving isn't in this version yet.")
-                }
-            }
-        }
+        .autosave(item, id: entry.id, data: data, body: item.bodyField == nil ? nil : text)
     }
 }
 
