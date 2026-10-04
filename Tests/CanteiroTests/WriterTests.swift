@@ -65,7 +65,7 @@ import Testing
         for s in ["", " pad", "true", "No", "null", "12", "3.5", "2026-09-28", "- dash", "a: b", "#hash", "x #y", "'q"] {
             #expect(YAMLEmitter.needsQuotes(s), "\(s)")
         }
-        for s in ["Moon Road", "Ash Season", "The Stranger's Gun", "A Coruña", "/tales/", "http://x.y/z"] {
+        for s in ["2026-10-04-1032", "Moon Road", "Ash Season", "The Stranger's Gun", "A Coruña", "/tales/", "http://x.y/z"] {
             #expect(!YAMLEmitter.needsQuotes(s), "\(s)")
         }
     }

@@ -14,6 +14,7 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 300)
         } detail: {
             detail
+                .safeAreaInset(edge: .bottom, spacing: 0) { UploadBar() }
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         Button {
@@ -43,6 +44,10 @@ struct ContentView: View {
         }
         .navigationTitle(store.siteName)
         .sheet(isPresented: $showPublish) { PublishSheet() }
+        .onReceive(NotificationCenter.default.publisher(for: AsideHotKey.pressed)) { _ in
+            NSApp.activate()
+            openWindow(id: "aside")
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Catch commits and edits made outside the app.
             store.refreshChanges()

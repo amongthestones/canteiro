@@ -77,6 +77,11 @@ struct SchemaItem: Decodable, Sendable, Identifiable, Hashable {
         format.contentField == nil && dateField != nil && textField != nil
     }
 
+    /// The folder a collection's entries live in (src/content/asides).
+    var folder: String {
+        path.replacingOccurrences(of: "/**", with: "").replacingOccurrences(of: "/*", with: "")
+    }
+
     /// The first multiline text field: an aside's text, a work's blurb.
     var textField: FieldSpec? {
         dataFields.first { $0.type == "text" && $0.multiline == true }
@@ -158,6 +163,8 @@ final class FieldSpec: Decodable, Sendable, Identifiable {
     let slug: SubLabel?
     /// A list's cap from the site's Astro schema (a post has one kind).
     let maxItems: Int?
+    /// The default when it's a plain string (a select's "en").
+    let defaultString: String?
 
     var id: String { key }
     /// Keystatic's conditional has no label of its own; its menu has one.
@@ -165,7 +172,7 @@ final class FieldSpec: Decodable, Sendable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case key, type, label, description, multiline, options, validation, fields, element
-        case discriminant, values, collection, slug, maxItems
+        case discriminant, values, collection, slug, maxItems, defaultValue
         case extensionName = "extension"
     }
 
@@ -188,6 +195,7 @@ final class FieldSpec: Decodable, Sendable, Identifiable {
         extensionName = try c.decodeIfPresent(String.self, forKey: .extensionName)
         slug = try? c.decodeIfPresent(SubLabel.self, forKey: .slug)
         maxItems = try c.decodeIfPresent(Int.self, forKey: .maxItems)
+        defaultString = try? c.decodeIfPresent(String.self, forKey: .defaultValue)
     }
 
     var maxLength: Int? { validation?.length?.max }

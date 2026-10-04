@@ -27,6 +27,10 @@ final class SiteStore {
     private(set) var saveErrors: [Entry.ID: String] = [:]
     /// Changed files in the site's repo, for Publish.
     private(set) var changes: [GitChange] = []
+    /// Uploads in flight, for the bar at the bottom of the window.
+    private(set) var uploads: [Upload] = []
+    /// The last thing that went wrong with a new entry or an upload.
+    var lastError: String?
     /// Whether the preview window is open, for the toolbar's eye button.
     var previewOpen = false
     /// Counts saves, so the preview knows to reload.
@@ -120,7 +124,7 @@ final class SiteStore {
 
     /// Newest first when entries have a date, then by an `order` number,
     /// else by title.
-    nonisolated private static func sorted(_ list: [Entry], item: SchemaItem) -> [Entry] {
+    nonisolated static func sorted(_ list: [Entry], item: SchemaItem) -> [Entry] {
         if let date = item.dateField {
             return list.sorted { ($0.data[date.key]?.date ?? .distantPast) > ($1.data[date.key]?.date ?? .distantPast) }
         }
@@ -189,6 +193,107 @@ final class SiteStore {
         } else if let index = entries[item.key]?.firstIndex(where: { $0.id == entry.id }) {
             entries[item.key]?[index] = entry
         }
+    }
+
+    // MARK: New entries
+
+    /// Writes a new entry and selects it. The file name is the slug, made
+    /// unique with -2, -3 if it's taken.
+    @discardableResult
+    func create(_ item: SchemaItem, slug: String, data: FieldValue, body: String? = nil) throws -> Entry {
+        guard let siteURL, item.kind == .collection else { throw ContentLoader.Failure.unreadable(item.label, "not a collection") }
+        let folder = siteURL.appending(path: item.folder)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        var name = slug
+        var n = 2
+        while FileManager.default.fileExists(atPath: folder.appending(path: "\(name).\(item.fileExtension)").path) {
+            name = "\(slug)-\(n)"
+            n += 1
+        }
+        guard case .object(let pairs) = data else { throw ContentLoader.Failure.unreadable(item.label, "no fields") }
+        let yaml = pairs.flatMap { YAMLEmitter.lines(key: $0.key, value: $0.value, indent: 0) }.joined(separator: "\n")
+        let text = item.format.contentField != nil ? "---\n\(yaml)\n---\n" + (body ?? "") : yaml + "\n"
+        let url = folder.appending(path: "\(name).\(item.fileExtension)")
+        try text.write(to: url, atomically: true, encoding: .utf8)
+        let entry = try ContentLoader.read(url, slug: name, site: siteURL, hasBody: item.format.contentField != nil)
+        entries[item.key] = Self.sorted((entries[item.key] ?? []) + [entry], item: item)
+        selectedItem = item.key
+        selectedEntry[item.key] = entry.id
+        saveCount += 1
+        refreshChanges()
+        return entry
+    }
+
+    /// A new entry's fields in schema order: the given values, then for each
+    /// field the site needs (required ones, switches, menus) its default.
+    func newData(_ item: SchemaItem, _ values: [String: FieldValue]) -> FieldValue {
+        var pairs: [FieldPair] = []
+        for field in item.dataFields {
+            if let value = values[field.key] {
+                pairs.append(FieldPair(key: field.key, value: value))
+            } else if field.type == "checkbox" {
+                pairs.append(FieldPair(key: field.key, value: .bool(false)))
+            } else if field.type == "select", let value = field.defaultString ?? field.options?.first?.value {
+                pairs.append(FieldPair(key: field.key, value: .string(value)))
+            }
+        }
+        return .object(pairs)
+    }
+
+    /// The first dated stream of short text: the asides.
+    var streamItem: SchemaItem? { schema?.items.first { $0.isStream } }
+
+    /// Saves a new aside: the text, now, and the language picked.
+    func createAside(text: String, language: String?) throws {
+        guard let item = streamItem, let textField = item.textField else { return }
+        let now = Date.now
+        let slug = Self.stamp(now, "yyyy-MM-dd-HHmm")
+        var values: [String: FieldValue] = [textField.key: .string(text)]
+        if let slugField = item.slugField { values[slugField] = .string(slug) }
+        if let date = item.dateField { values[date.key] = Self.dateValue(now, type: date.type) }
+        if let language, let field = item.dataFields.first(where: { $0.type == "select" && $0.key.hasPrefix("lang") }) {
+            values[field.key] = .string(language)
+        }
+        try create(item, slug: slug, data: newData(item, values))
+    }
+
+    // MARK: Uploads
+
+    struct Upload: Identifiable, Sendable {
+        let id = UUID()
+        let name: String
+        var progress: Double = 0
+    }
+
+    /// Puts a file on R2 and returns its public address.
+    func upload(_ file: URL, key: String, contentType: String, name: String) async throws -> String {
+        let client = try R2Client.fromSettings()
+        let upload = Upload(name: name)
+        uploads.append(upload)
+        defer { uploads.removeAll { $0.id == upload.id } }
+        try await client.put(file, key: key, contentType: contentType) { fraction in
+            Task { @MainActor in
+                if let i = self.uploads.firstIndex(where: { $0.id == upload.id }) { self.uploads[i].progress = fraction }
+            }
+        }
+        return R2Settings.publicURL(for: key)
+    }
+
+    nonisolated static func stamp(_ date: Date, _ format: String, utc: Bool = false) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        if utc { f.timeZone = TimeZone(identifier: "UTC") }
+        f.dateFormat = format
+        return f.string(from: date)
+    }
+
+    /// A date the way Keystatic writes it: 2026-10-04, or UTC with milliseconds.
+    nonisolated static func dateValue(_ date: Date, type: String) -> FieldValue {
+        // Keystatic saves to the minute.
+        let date = Date(timeIntervalSinceReferenceDate: (date.timeIntervalSinceReferenceDate / 60).rounded(.down) * 60)
+        return type == "date"
+            ? .date(date, raw: stamp(date, "yyyy-MM-dd"))
+            : .date(date, raw: stamp(date, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", utc: true))
     }
 
     // MARK: Publishing

@@ -33,9 +33,23 @@ struct CanteiroApp: App {
         }
         .defaultSize(width: 620, height: 820)
         .defaultPosition(.trailing)
+
+        Window("New Aside", id: "aside") {
+            QuickAsideView()
+                .environment(store)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+        .windowStyle(.hiddenTitleBar)
+
+        Settings {
+            SettingsView()
+        }
         .commands {
             SaveCommand()
             CommandGroup(replacing: .newItem) {
+                NewAsideButton()
+                Divider()
                 Button("Open Site…") { store.chooseSite() }
                     .keyboardShortcut("o")
                 Button("Reload Site") { store.reload() }
@@ -47,11 +61,24 @@ struct CanteiroApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let asideHotKey = AsideHotKey()
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        asideHotKey.register()
         // Under `swift run` there's no bundle to say this is a regular app.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
+/// File › New Aside. A view, so it can open the window.
+private struct NewAsideButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("New Aside") { openWindow(id: "aside") }
+            .keyboardShortcut("a", modifiers: [.command, .shift])
+    }
 }

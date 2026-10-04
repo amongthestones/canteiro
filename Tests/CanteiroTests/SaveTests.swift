@@ -62,4 +62,26 @@ import Testing
         #expect(!store.conflicts.contains(entry.id))
         #expect(store.current(item, id: entry.id)?.raw == elsewhere)
     }
+
+    @Test(.enabled(if: SiteStore.isSite(site)))
+    func aNewAsideLooksLikeKeystatics() async throws {
+        let copy = try scratchSite()
+        defer { try? FileManager.default.removeItem(at: copy) }
+        let store = SiteStore()
+        await store.open(copy)
+        let before = store.entries["asides"]?.count ?? 0
+        try store.createAside(text: "Autumn: the chestnuts are out: magosto soon.", language: "en")
+
+        let asides = try #require(store.entries["asides"])
+        #expect(asides.count == before + 1)
+        let new = try #require(asides.first { $0.id == store.selectedEntry["asides"] })
+        let lines = new.raw.split(separator: "\n").map(String.init)
+        #expect(lines.map { String($0.prefix { $0 != ":" }) } == ["name", "draft", "text", "date", "language"])
+        #expect(lines[0] == "name: \(new.slug)")
+        #expect(lines[1] == "draft: false")
+        #expect(lines[2] == "text: \"Autumn: the chestnuts are out: magosto soon.\"")
+        #expect(lines[3].range(of: #"^date: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$"#, options: .regularExpression) != nil)
+        #expect(lines[4] == "language: en")
+        #expect(new.data["date"]?.date != nil)
+    }
 }

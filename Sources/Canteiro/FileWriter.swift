@@ -138,7 +138,9 @@ enum YAMLEmitter {
         if ["true", "false", "yes", "no", "on", "off", "null", "~", "y", "n"].contains(lower) { return true }
         // Anything that reads back as a number or a date.
         if Double(s) != nil || Int(s) != nil || s.hasPrefix("0x") || s.hasPrefix("0o") { return true }
-        if s.range(of: #"^\d{4}-\d{2}-\d{2}"#, options: .regularExpression) != nil { return true }
+        // A YAML date: 2026-10-04 alone, or with a time after a T or a space.
+        // 2026-10-04-1032 (an aside's name) is just a string.
+        if s.range(of: #"^\d{4}-\d{1,2}-\d{1,2}([Tt]|\s|$)"#, options: .regularExpression) != nil { return true }
         return false
     }
 
