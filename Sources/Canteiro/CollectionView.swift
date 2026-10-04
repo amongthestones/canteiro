@@ -66,6 +66,11 @@ struct EntryRow: View {
             let line = body.split(separator: "\n").first { !$0.trimmingCharacters(in: .whitespaces).isEmpty && !$0.hasPrefix("![") && !$0.hasPrefix("#") }
             return line.map(String.init) ?? entry.slug
         }
+        // No body: a text field such as a work's blurb says more than the
+        // file name. A stream's text is already the title.
+        if !item.isStream, let field = item.textField, let text = entry.data[field.key]?.string, !text.isEmpty {
+            return text
+        }
         return entry.slug
     }
 

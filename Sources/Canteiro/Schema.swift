@@ -72,13 +72,20 @@ struct SchemaItem: Decodable, Sendable, Identifiable, Hashable {
         dataFields.first { $0.type == "date" || $0.type == "datetime" }
     }
 
-    /// What names an entry in the list. Short data entries with no body (an
-    /// aside) read better by their text than by their file name.
+    /// A dated stream of short text entries with no body: asides.
+    var isStream: Bool {
+        format.contentField == nil && dateField != nil && textField != nil
+    }
+
+    /// The first multiline text field: an aside's text, a work's blurb.
+    var textField: FieldSpec? {
+        dataFields.first { $0.type == "text" && $0.multiline == true }
+    }
+
+    /// What names an entry in the list. A stream entry reads better by its
+    /// text than by its file name; anything else goes by its title.
     var titleField: FieldSpec? {
-        if format.contentField == nil,
-           let text = dataFields.first(where: { $0.type == "text" && $0.multiline == true }) {
-            return text
-        }
+        if isStream, let text = textField { return text }
         if let slugField, let field = dataFields.first(where: { $0.key == slugField }) { return field }
         return dataFields.first { $0.type == "text" || $0.type == "slug" }
     }
@@ -146,7 +153,8 @@ final class FieldSpec: Decodable, Sendable, Identifiable {
     let slug: SubLabel?
 
     var id: String { key }
-    var title: String { label ?? key }
+    /// Keystatic's conditional has no label of its own; its menu has one.
+    var title: String { label ?? discriminant?.label ?? key }
 
     enum CodingKeys: String, CodingKey {
         case key, type, label, description, multiline, options, validation, fields, element

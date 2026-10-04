@@ -89,7 +89,7 @@ struct SidebarView: View {
         }
         if item.fields.contains(where: { $0.key.lowercased().contains("audio") }) { return "mic" }
         if item.format.contentField == nil {
-            return item.dateField != nil ? "text.bubble" : "square.stack"
+            return item.isStream ? "text.bubble" : "square.stack"
         }
         if item.path.hasSuffix("**") { return "books.vertical" }
         return item.dateField != nil ? "doc.text" : "doc"
