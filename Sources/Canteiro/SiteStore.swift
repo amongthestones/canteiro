@@ -25,6 +25,8 @@ final class SiteStore {
     /// stops and asks rather than write over the other change.
     private(set) var conflicts: Set<Entry.ID> = []
     private(set) var saveErrors: [Entry.ID: String] = [:]
+    /// Counts saves, so the preview knows to reload.
+    private(set) var saveCount = 0
     /// Bumped when an entry is reread from disk, so its editor starts over.
     private(set) var revisions: [Entry.ID: Int] = [:]
 
@@ -155,6 +157,7 @@ final class SiteStore {
             replace(saved, in: item)
             conflicts.remove(id)
             saveErrors[id] = nil
+            saveCount += 1
         } catch {
             saveErrors[id] = error.localizedDescription
         }
@@ -180,6 +183,16 @@ final class SiteStore {
         } else if let index = entries[item.key]?.firstIndex(where: { $0.id == entry.id }) {
             entries[item.key]?[index] = entry
         }
+    }
+
+    /// The site address of what's open, from Keystatic's previewUrl. A
+    /// settings page has none, so it previews the home page.
+    var previewPath: String? {
+        guard let key = selectedItem, let item = schema?.item(key) else { return nil }
+        if item.kind == .singleton { return "/" }
+        guard let template = item.previewUrl, let id = selectedEntry[key],
+              let entry = entries[key]?.first(where: { $0.id == id }) else { return nil }
+        return template.replacingOccurrences(of: "{slug}", with: entry.slug)
     }
 
     func count(_ item: SchemaItem) -> Int? {

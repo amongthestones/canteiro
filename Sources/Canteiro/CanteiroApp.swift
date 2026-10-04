@@ -5,11 +5,16 @@ import SwiftUI
 struct CanteiroApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var store = SiteStore()
+    @State private var preview = PreviewServer()
 
     var body: some Scene {
         Window("Canteiro", id: "main") {
             ContentView()
                 .environment(store)
+                .environment(preview)
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+                    preview.stop()
+                }
                 .frame(minWidth: 960, minHeight: 600)
                 .task { await store.restore() }
         }

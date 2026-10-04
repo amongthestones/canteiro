@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(SiteStore.self) private var store
+    @AppStorage("showPreview") private var showPreview = false
 
     var body: some View {
         @Bindable var store = store
@@ -10,6 +11,19 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 300)
         } detail: {
             detail
+                .inspector(isPresented: $showPreview) {
+                    PreviewPane()
+                        .inspectorColumnWidth(min: 360, ideal: 560, max: 1000)
+                }
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Toggle(isOn: $showPreview) {
+                            Label("Preview", systemImage: "eye")
+                        }
+                        .help("Show the page as the site renders it, drafts included")
+                        .disabled(store.phase != .ready)
+                    }
+                }
         }
         .navigationTitle(store.siteName)
     }
