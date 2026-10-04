@@ -51,12 +51,7 @@ struct EntryEditor: View {
                     Divider()
                 }
                 if item.bodyField != nil {
-                    TextEditor(text: $text)
-                        .font(.system(size: 14, design: .monospaced))
-                        .lineSpacing(5)
-                        .scrollDisabled(true)
-                        .scrollContentBackground(.hidden)
-                        .frame(maxWidth: .infinity, minHeight: 320, alignment: .topLeading)
+                    BodyTextView(text: $text)
                         .padding(.top, 18)
                 }
             }
