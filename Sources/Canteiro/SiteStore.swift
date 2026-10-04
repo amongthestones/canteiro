@@ -25,6 +25,8 @@ final class SiteStore {
     /// stops and asks rather than write over the other change.
     private(set) var conflicts: Set<Entry.ID> = []
     private(set) var saveErrors: [Entry.ID: String] = [:]
+    /// Changed files in the site's repo, for Publish.
+    private(set) var changes: [GitChange] = []
     /// Counts saves, so the preview knows to reload.
     private(set) var saveCount = 0
     /// Bumped when an entry is reread from disk, so its editor starts over.
@@ -81,6 +83,7 @@ final class SiteStore {
             entries = loaded.entries
             singletons = loaded.singletons
             problems = loaded.problems
+            refreshChanges()
             if selectedItem == nil || schema.item(selectedItem!) == nil {
                 selectedItem = schema.groups.first?.items.first?.key
             }
@@ -158,6 +161,7 @@ final class SiteStore {
             conflicts.remove(id)
             saveErrors[id] = nil
             saveCount += 1
+            refreshChanges()
         } catch {
             saveErrors[id] = error.localizedDescription
         }
@@ -183,6 +187,44 @@ final class SiteStore {
         } else if let index = entries[item.key]?.firstIndex(where: { $0.id == entry.id }) {
             entries[item.key]?[index] = entry
         }
+    }
+
+    // MARK: Publishing
+
+    func refreshChanges() {
+        guard let siteURL else { return }
+        Task {
+            let found = await Task.detached { (try? Git.status(siteURL)) ?? [] }.value
+            if self.siteURL == siteURL { changes = found }
+        }
+    }
+
+    /// Changes to files Keystatic manages: the ones Publish ticks for you.
+    /// Code changes in progress are listed but left unticked.
+    var contentChanges: [GitChange] { changes.filter { isContent($0.path) } }
+
+    func isContent(_ path: String) -> Bool {
+        guard let schema else { return false }
+        return schema.items.contains { item in
+            switch item.kind {
+            case .singleton:
+                return path == item.path + "." + item.fileExtension
+            case .collection:
+                let folder = item.path.replacingOccurrences(of: "/**", with: "").replacingOccurrences(of: "/*", with: "")
+                return path.hasPrefix(folder + "/")
+            }
+        }
+    }
+
+    /// The entry's title for a changed file, or the section's name for a
+    /// settings file.
+    func title(forPath path: String) -> String? {
+        guard let schema else { return nil }
+        for item in schema.items {
+            if item.kind == .singleton, path == item.path + "." + item.fileExtension { return item.label }
+            if let entry = entries[item.key]?.first(where: { $0.id == path }) { return Self.title(of: entry, item: item) }
+        }
+        return nil
     }
 
     /// The site address of what's open, from Keystatic's previewUrl. A

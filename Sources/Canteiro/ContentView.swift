@@ -1,8 +1,10 @@
+import AppKit
 import SwiftUI
 
 struct ContentView: View {
     @Environment(SiteStore.self) private var store
     @AppStorage("showPreview") private var showPreview = false
+    @State private var showPublish = false
 
     var body: some View {
         @Bindable var store = store
@@ -17,6 +19,16 @@ struct ContentView: View {
                 }
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            showPublish = true
+                        } label: {
+                            Label("Publish", systemImage: "arrow.up.circle")
+                        }
+                        .badge(store.contentChanges.count)
+                        .help("Commit and push your changes")
+                        .disabled(store.changes.isEmpty)
+                    }
+                    ToolbarItem(placement: .primaryAction) {
                         Toggle(isOn: $showPreview) {
                             Label("Preview", systemImage: "eye")
                         }
@@ -26,6 +38,11 @@ struct ContentView: View {
                 }
         }
         .navigationTitle(store.siteName)
+        .sheet(isPresented: $showPublish) { PublishSheet() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            // Catch commits and edits made outside the app.
+            store.refreshChanges()
+        }
     }
 
     @ViewBuilder

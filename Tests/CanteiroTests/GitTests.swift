@@ -1,0 +1,77 @@
+import Foundation
+import Testing
+@testable import Canteiro
+
+/// Git against a throwaway repo and a local "GitHub". Never the real remote.
+@Suite struct GitTests {
+    private func sh(_ dir: URL, _ args: [String]) throws {
+        let out = try Subprocess.run(Git.git, ["-C", dir.path] + args, timeout: 20)
+        #expect(out.status == 0, "\(args): \(out.stderrString)")
+    }
+
+    /// A bare remote, and a clone of it with one commit, pushed.
+    private func repo() throws -> (work: URL, remote: URL) {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appending(path: "canteiro-git-\(UUID().uuidString)")
+        let remote = root.appending(path: "remote.git")
+        let work = root.appending(path: "work")
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        try sh(root, ["init", "-q", "--bare", "-b", "main", remote.path])
+        try sh(root, ["clone", "-q", remote.path, work.path])
+        try sh(work, ["config", "user.email", "test@example.com"])
+        try sh(work, ["config", "user.name", "Test"])
+        try "title: One\n".write(to: work.appending(path: "post.yaml"), atomically: true, encoding: .utf8)
+        try sh(work, ["add", "-A"])
+        try sh(work, ["commit", "-q", "-m", "First"])
+        try sh(work, ["push", "-q", "-u", "origin", "main"])
+        return (work, remote)
+    }
+
+    @Test func statusSeesEditsAndNewFiles() throws {
+        let (work, _) = try repo()
+        try "title: Two\n".write(to: work.appending(path: "post.yaml"), atomically: true, encoding: .utf8)
+        try FileManager.default.createDirectory(at: work.appending(path: "src"), withIntermediateDirectories: true)
+        try "new\n".write(to: work.appending(path: "src/new file.md"), atomically: true, encoding: .utf8)
+        let changes = try Git.status(work)
+        #expect(changes.map(\.path).sorted() == ["post.yaml", "src/new file.md"])
+        #expect(changes.first { $0.path == "src/new file.md" }?.isNew == true)
+        #expect(Git.diff(work, changes.first { $0.path == "post.yaml" }!).contains("+title: Two"))
+        #expect(Git.diff(work, changes.first { $0.path == "src/new file.md" }!).contains("+new"))
+    }
+
+    @Test func publishesOnlyThePickedFiles() throws {
+        let (work, remote) = try repo()
+        try "title: Two\n".write(to: work.appending(path: "post.yaml"), atomically: true, encoding: .utf8)
+        try "code in progress\n".write(to: work.appending(path: "code.ts"), atomically: true, encoding: .utf8)
+        try sh(work, ["add", "code.ts"]) // staged by hand, must not ride along
+
+        try Git.commitAndPush(work, paths: ["post.yaml"], message: "Edit One")
+
+        let pushed = try Subprocess.run(Git.git, ["-C", remote.path, "log", "-1", "--name-only", "--format=%s"], timeout: 10).stdoutString
+        #expect(pushed.contains("Edit One"))
+        #expect(pushed.contains("post.yaml"))
+        #expect(!pushed.contains("code.ts"))
+        #expect(try Git.status(work).map(\.path) == ["code.ts"])
+    }
+
+    @Test func aRejectedPushSaysWhy() throws {
+        let (work, remote) = try repo()
+        // Someone else pushes first.
+        let other = remote.deletingLastPathComponent().appending(path: "other")
+        try sh(remote.deletingLastPathComponent(), ["clone", "-q", remote.path, other.path])
+        try sh(other, ["config", "user.email", "o@example.com"])
+        try sh(other, ["config", "user.name", "Other"])
+        try "elsewhere\n".write(to: other.appending(path: "other.yaml"), atomically: true, encoding: .utf8)
+        try sh(other, ["add", "-A"])
+        try sh(other, ["commit", "-q", "-m", "Other"])
+        try sh(other, ["push", "-q"])
+
+        try "title: Two\n".write(to: work.appending(path: "post.yaml"), atomically: true, encoding: .utf8)
+        #expect(throws: Git.Failure.self) { try Git.commitAndPush(work, paths: ["post.yaml"], message: "Edit") }
+
+        try Git.pullRebase(work)
+        try Git.push(work)
+        let log = try Subprocess.run(Git.git, ["-C", remote.path, "log", "--format=%s"], timeout: 10).stdoutString
+        #expect(log.split(separator: "\n") == ["Edit", "Other", "First"])
+    }
+}
