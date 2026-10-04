@@ -10,12 +10,24 @@ struct EntryEditor: View {
     @State private var data: FieldValue
     @State private var text: String
     @State private var showMore = false
+    /// Blank lines between the frontmatter and the text. Most imported posts
+    /// have one; the editor starts at the first real line, and saves put
+    /// them back so the file doesn't change for it.
+    private let lead: String
 
     init(item: SchemaItem, entry: Entry) {
         self.item = item
         self.entry = entry
+        let parts = Self.splitLead(entry.body ?? "")
+        lead = parts.lead
         _data = State(initialValue: entry.data)
-        _text = State(initialValue: entry.body ?? "")
+        _text = State(initialValue: parts.text)
+    }
+
+    /// The blank lines at the top of a body, and the rest.
+    static func splitLead(_ body: String) -> (lead: String, text: String) {
+        let lead = String(body.prefix { $0 == "\n" || $0 == "\r" })
+        return (lead, String(body.dropFirst(lead.count)))
     }
 
     /// Fields worth seeing at once: required ones, ones with a value, and
@@ -60,7 +72,7 @@ struct EntryEditor: View {
             .frame(maxWidth: 820, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .autosave(item, id: entry.id, data: data, body: item.bodyField == nil ? nil : text)
+        .autosave(item, id: entry.id, data: data, body: item.bodyField == nil ? nil : lead + text)
     }
 }
 

@@ -49,6 +49,23 @@ import Testing
         #expect(checked > 280)
     }
 
+    /// The editor hides the blank line most posts start with; putting it back
+    /// gives every body on the site back exactly.
+    @Test(.enabled(if: SiteStore.isSite(site)))
+    func hiddenLeadingLinesComeBack() async throws {
+        let schema = try await SchemaLoader.load(site: Self.site)
+        let loaded = SiteStore.readAll(schema, site: Self.site)
+        var hidden = 0
+        for entry in loaded.entries.values.flatMap({ $0 }) {
+            guard let body = entry.body else { continue }
+            let parts = await EntryEditor.splitLead(body)
+            #expect(parts.lead + parts.text == body, "\(entry.id)")
+            #expect(!parts.text.hasPrefix("\n"))
+            if !parts.lead.isEmpty { hidden += 1 }
+        }
+        #expect(hidden > 200)
+    }
+
     /// Equal values, with dates compared by instant (a rewrite keeps the raw text anyway).
     static func same(_ a: FieldValue, _ b: FieldValue) -> Bool {
         switch (a, b) {
