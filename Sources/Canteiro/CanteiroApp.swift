@@ -19,6 +19,20 @@ struct CanteiroApp: App {
                 .task { await store.restore() }
         }
         .defaultSize(width: 1280, height: 820)
+
+        // The open entry as the site renders it. Its own window, so it can sit
+        // beside the editor or on another screen at any size.
+        Window("Preview", id: "preview") {
+            PreviewPane()
+                .environment(store)
+                .environment(preview)
+                .frame(minWidth: 360, minHeight: 400)
+                .navigationTitle("Preview")
+                .onAppear { store.previewOpen = true }
+                .onDisappear { store.previewOpen = false }
+        }
+        .defaultSize(width: 620, height: 820)
+        .defaultPosition(.trailing)
         .commands {
             SaveCommand()
             CommandGroup(replacing: .newItem) {

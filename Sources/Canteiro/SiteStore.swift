@@ -27,6 +27,8 @@ final class SiteStore {
     private(set) var saveErrors: [Entry.ID: String] = [:]
     /// Changed files in the site's repo, for Publish.
     private(set) var changes: [GitChange] = []
+    /// Whether the preview window is open, for the toolbar's eye button.
+    var previewOpen = false
     /// Counts saves, so the preview knows to reload.
     private(set) var saveCount = 0
     /// Bumped when an entry is reread from disk, so its editor starts over.

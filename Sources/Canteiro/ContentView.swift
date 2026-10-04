@@ -3,8 +3,8 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(SiteStore.self) private var store
-    @AppStorage("showPreview") private var showPreview = false
-    @AppStorage("previewWidth") private var previewWidth = 520.0
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
     @State private var showPublish = false
 
     var body: some View {
@@ -13,19 +13,7 @@ struct ContentView: View {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 300)
         } detail: {
-            // The preview is a plain column with a drag handle, not an
-            // .inspector: that adds a split view inside the window's split
-            // view, and the two resized each other in a loop that crashed the
-            // app on launch about half the time.
-            HStack(spacing: 0) {
-                detail
-                    .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
-                if showPreview {
-                    ResizeHandle(width: $previewWidth, range: 320...900, grows: .left)
-                    PreviewPane()
-                        .frame(width: previewWidth)
-                }
-            }
+            detail
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         Button {
@@ -38,10 +26,17 @@ struct ContentView: View {
                         .disabled(store.changes.isEmpty)
                     }
                     ToolbarItem(placement: .primaryAction) {
-                        Toggle(isOn: $showPreview) {
+                        // The preview has its own window, kept out of this
+                        // one's layout: as a side panel it squeezed the
+                        // sidebar, and as an .inspector it crashed the app.
+                        Toggle(isOn: Binding(
+                            get: { store.previewOpen },
+                            set: { $0 ? openWindow(id: "preview") : dismissWindow(id: "preview") }
+                        )) {
                             Label("Preview", systemImage: "eye")
                         }
-                        .help("Show the page as the site renders it, drafts included")
+                        .help("Show the page as the site renders it, drafts included, in its own window")
+                        .keyboardShortcut("p", modifiers: [.command, .option])
                         .disabled(store.phase != .ready)
                     }
                 }
