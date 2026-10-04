@@ -30,7 +30,7 @@ struct CollectionView: View {
                 }
             }
 
-            ResizeHandle(width: $listWidth, range: 240...520)
+            ResizeHandle(width: $listWidth, range: 240...440)
 
             Group {
                 if let id = store.selectedEntry[item.key], let entry = store.entries[item.key]?.first(where: { $0.id == id }) {
@@ -40,7 +40,7 @@ struct CollectionView: View {
                     ContentUnavailableView("No Entry Selected", systemImage: SidebarView.icon(for: item))
                 }
             }
-            .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationSubtitle("\(item.label) · \(store.entries[item.key]?.count ?? 0)")
         .searchable(text: $search, placement: .toolbar, prompt: "Search \(item.label)")
@@ -141,8 +141,13 @@ struct SingletonEditor: View {
 /// A divider you can drag, with the column-resize pointer, like the edge
 /// between Mail's list and message.
 struct ResizeHandle: View {
+    enum Side { case right, left }
+
     @Binding var width: Double
     let range: ClosedRange<Double>
+    /// Which way dragging widens the column: a column left of the handle
+    /// grows as you drag right, one right of it as you drag left.
+    var grows: Side = .right
     @State private var start: Double?
 
     var body: some View {
@@ -157,7 +162,8 @@ struct ResizeHandle: View {
                             .onChanged { drag in
                                 let from = start ?? width
                                 start = from
-                                width = min(max(from + drag.translation.width, range.lowerBound), range.upperBound)
+                                let delta = grows == .right ? drag.translation.width : -drag.translation.width
+                                width = min(max(from + delta, range.lowerBound), range.upperBound)
                             }
                             .onEnded { _ in start = nil }
                     )

@@ -45,7 +45,9 @@ struct PreviewPane: View {
     }
 }
 
-/// A WKWebView that loads a page and reloads it after each save.
+/// A WKWebView that loads a page and reloads it after each save. It takes
+/// whatever space it's given: a web view can report its own size as a page
+/// loads, and inside split views that can start a resizing loop.
 struct WebView: NSViewRepresentable {
     let url: URL
     let reloadToken: Int
@@ -53,6 +55,10 @@ struct WebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let view = WKWebView()
         view.setValue(false, forKey: "drawsBackground")
+        view.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        view.setContentHuggingPriority(.defaultLow, for: .vertical)
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
         view.load(URLRequest(url: url))
         context.coordinator.loaded = (url, reloadToken)
         return view
@@ -68,6 +74,10 @@ struct WebView: NSViewRepresentable {
             view.reload()
         }
         context.coordinator.loaded = (url, reloadToken)
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: WKWebView, context: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? 360, height: proposal.height ?? 400)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }

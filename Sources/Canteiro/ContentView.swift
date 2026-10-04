@@ -4,6 +4,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(SiteStore.self) private var store
     @AppStorage("showPreview") private var showPreview = false
+    @AppStorage("previewWidth") private var previewWidth = 520.0
     @State private var showPublish = false
 
     var body: some View {
@@ -12,11 +13,19 @@ struct ContentView: View {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 300)
         } detail: {
-            detail
-                .inspector(isPresented: $showPreview) {
+            // The preview is a plain column with a drag handle, not an
+            // .inspector: that adds a split view inside the window's split
+            // view, and the two resized each other in a loop that crashed the
+            // app on launch about half the time.
+            HStack(spacing: 0) {
+                detail
+                    .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
+                if showPreview {
+                    ResizeHandle(width: $previewWidth, range: 320...900, grows: .left)
                     PreviewPane()
-                        .inspectorColumnWidth(min: 360, ideal: 560, max: 1000)
+                        .frame(width: previewWidth)
                 }
+            }
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         Button {
