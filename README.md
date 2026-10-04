@@ -6,8 +6,13 @@ It edits the site's markdown, YAML and JSON in place, builds its forms from
 the site's Keystatic config, handles photo and episode uploads to R2, and
 commits and pushes to publish.
 
-Status: step 1 of the plan. Browses the whole site with forms built from
-the Keystatic config. Edits stay in memory: saving is step 2.
+Status: in daily use. Browse and edit the whole site with forms built from the
+Keystatic config; autosave with clean diffs; Markdown and Rich views (⌘R);
+quick asides (⇧⌘A, or ⌃⌥A from any app); photo and MP3 drops that upload to
+R2; a preview window (⌥⌘P); Publish (commit and push).
+
+Uploads need an R2 API token in Settings (⌘,), and `cwebp` for WebP
+(`brew install webp`).
 
 ## Run it
 

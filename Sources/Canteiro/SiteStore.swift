@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Foundation
 import Observation
 
@@ -255,6 +256,51 @@ final class SiteStore {
             values[field.key] = .string(language)
         }
         try create(item, slug: slug, data: newData(item, values))
+    }
+
+    /// A collection of podcast episodes: entries with an audio address.
+    func isEpisodes(_ item: SchemaItem) -> Bool {
+        item.kind == .collection && item.dataFields.contains { $0.key == "audioUrl" }
+    }
+
+    /// A dropped MP3 becomes a draft episode: its length read, the file put
+    /// on R2 under podcasts/<show>/, the next number and a guid filled in.
+    func createEpisode(_ item: SchemaItem, from file: URL) async {
+        do {
+            let show = URL(fileURLWithPath: item.folder).lastPathComponent
+            let seconds = try await AVURLAsset(url: file).load(.duration).seconds
+            let base = Slug.make(file.deletingPathExtension().lastPathComponent)
+            let key = "podcasts/\(show)/\(base).\(file.pathExtension.lowercased())"
+            let number = (entries[item.key]?.compactMap { $0.data["episodeNumber"]?.int }.max() ?? 0) + 1
+            let url = try await upload(file, key: key, contentType: "audio/mpeg", name: file.lastPathComponent)
+            try addEpisode(item, slug: base, number: number, seconds: seconds, audioURL: url)
+        } catch {
+            lastError = "\(file.lastPathComponent): \(error.localizedDescription)"
+        }
+    }
+
+    /// The draft entry for an uploaded episode.
+    func addEpisode(_ item: SchemaItem, slug: String, number: Int, seconds: Double, audioURL: String) throws {
+        let show = URL(fileURLWithPath: item.folder).lastPathComponent
+        var values: [String: FieldValue] = [:]
+        func set(_ key: String, _ value: FieldValue) {
+            if item.dataFields.contains(where: { $0.key == key }) { values[key] = value }
+        }
+        set("title", .string("Episode \(number)"))
+        set("draft", .bool(true))
+        if let date = item.dateField { values[date.key] = Self.dateValue(.now, type: date.type) }
+        set("episodeNumber", .int(number))
+        set("guid", .string("\(show)-\(number)"))
+        set("audioUrl", .string(audioURL))
+        set("duration", .string(Self.duration(seconds)))
+        set("mimeType", .string("audio/mpeg"))
+        try create(item, slug: slug, data: newData(item, values), body: "")
+    }
+
+    /// HH:MM:SS, as <itunes:duration> takes it.
+    nonisolated static func duration(_ seconds: Double) -> String {
+        let total = Int(seconds.rounded())
+        return String(format: "%02d:%02d:%02d", total / 3600, total / 60 % 60, total % 60)
     }
 
     // MARK: Uploads

@@ -33,6 +33,13 @@ struct FieldControl: View {
                         .foregroundStyle(.secondary)
                 }
             }
+        case "text" where spec.key == "guid" && !value.isEmpty:
+            // Podcast apps track an episode by its guid: set once, never changed.
+            HStack(spacing: 6) {
+                Image(systemName: "lock.fill").foregroundStyle(.secondary).font(.caption)
+                Text(value.string ?? "").font(.callout.monospaced()).textSelection(.enabled)
+            }
+            .help("Locked: podcast apps track the episode by it")
         case "text", "url":
             TextInput(spec: spec, text: stringBinding)
         case "integer":

@@ -47,6 +47,7 @@ struct CanteiroApp: App {
         }
         .commands {
             SaveCommand()
+            BodyModeCommand()
             CommandGroup(replacing: .newItem) {
                 NewAsideButton()
                 Divider()
@@ -80,5 +81,20 @@ private struct NewAsideButton: View {
     var body: some View {
         Button("New Aside") { openWindow(id: "aside") }
             .keyboardShortcut("a", modifiers: [.command, .shift])
+    }
+}
+
+/// View › Show Rich Text / Show Markdown (⌘R), as in iA Writer.
+private struct BodyModeCommand: Commands {
+    @AppStorage("bodyMode") private var bodyMode = BodyMode.markdown
+
+    var body: some Commands {
+        CommandGroup(before: .toolbar) {
+            Button(bodyMode == .markdown ? "Show Rich Text" : "Show Markdown") {
+                bodyMode = bodyMode == .markdown ? .rich : .markdown
+            }
+            .keyboardShortcut("r")
+            Divider()
+        }
     }
 }

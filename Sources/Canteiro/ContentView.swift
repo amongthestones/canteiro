@@ -6,6 +6,7 @@ struct ContentView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var showPublish = false
+    @AppStorage("bodyMode") private var bodyMode = BodyMode.markdown
 
     var body: some View {
         @Bindable var store = store
@@ -16,6 +17,15 @@ struct ContentView: View {
             detail
                 .safeAreaInset(edge: .bottom, spacing: 0) { UploadBar() }
                 .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        // Same text either way; Rich hides the marks.
+                        Picker("Text", selection: $bodyMode) {
+                            Text("Markdown").tag(BodyMode.markdown)
+                            Text("Rich").tag(BodyMode.rich)
+                        }
+                        .pickerStyle(.segmented)
+                        .help("Markdown shows the marks; Rich hides them and shows the result (⌘R)")
+                    }
                     ToolbarItem(placement: .primaryAction) {
                         Button {
                             showPublish = true

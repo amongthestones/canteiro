@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// A collection: its entries on the left, the selected one on the right.
 struct CollectionView: View {
@@ -6,6 +7,7 @@ struct CollectionView: View {
     let item: SchemaItem
     @State private var search = ""
     @AppStorage("listWidth") private var listWidth = 320.0
+    @State private var dropTargeted = false
 
     private var entries: [Entry] {
         let all = store.entries[item.key] ?? []
@@ -19,11 +21,20 @@ struct CollectionView: View {
         // sized it from its largest allowed width and squeezed the sidebar.)
         HStack(spacing: 0) {
             List(selection: $store.selectedEntry[item.key]) {
+                if store.isEpisodes(item) {
+                    EpisodeDropHint(targeted: dropTargeted)
+                }
                 ForEach(entries) { entry in
                     EntryRow(entry: entry, item: item).tag(entry.id)
                 }
             }
             .frame(width: listWidth)
+            .dropDestination(for: URL.self) { urls, _ in
+                let audio = urls.filter { UTType(filenameExtension: $0.pathExtension)?.conforms(to: .audio) == true }
+                guard store.isEpisodes(item), !audio.isEmpty else { return false }
+                for file in audio { Task { await store.createEpisode(item, from: file) } }
+                return true
+            } isTargeted: { dropTargeted = $0 }
             .overlay {
                 if entries.isEmpty {
                     ContentUnavailableView(search.isEmpty ? "No Entries" : "No Matches", systemImage: SidebarView.icon(for: item))
@@ -47,6 +58,28 @@ struct CollectionView: View {
         .onAppear {
             if store.selectedEntry[item.key] == nil { store.selectedEntry[item.key] = entries.first?.id }
         }
+    }
+}
+
+/// The top of an episode list: where an MP3 goes.
+struct EpisodeDropHint: View {
+    let targeted: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "waveform").font(.title3).foregroundStyle(.tint)
+            Text("Drop an MP3 here for a new episode. It goes up to R2, and the length, number and guid fill in.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(targeted ? AnyShapeStyle(.tint.opacity(0.12)) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])).foregroundStyle(targeted ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary)))
+        .selectionDisabled()
+        .listRowSeparator(.hidden)
+        .padding(.vertical, 4)
     }
 }
 

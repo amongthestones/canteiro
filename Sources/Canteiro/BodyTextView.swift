@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The body editor: a TextKit 2 text view that grows to fit its text, so the
 /// fields and the body scroll together as one page. SwiftUI's TextEditor
@@ -7,14 +8,17 @@ import SwiftUI
 ///
 /// SwiftUI alone sizes the view. The text view never resizes itself, and its
 /// height is measured on a copy of the text, never by laying out the live
-/// view: either one makes AppKit and SwiftUI resize each other in a loop until
-/// AppKit stops the app (a crash on opening the preview panel).
+/// view: either one can make AppKit and SwiftUI resize each other in a loop.
 struct BodyTextView: NSViewRepresentable {
     @Binding var text: String
+    var mode: BodyMode = .markdown
     var minHeight: CGFloat = 320
+    /// Turns a dropped photo into the markdown to insert (`![](https://…)`).
+    var uploadPhoto: (@MainActor (URL) async throws -> String)?
+    var onError: (@MainActor (String) -> Void)?
 
-    func makeNSView(context: Context) -> NSTextView {
-        let view = NSTextView(usingTextLayoutManager: true)
+    func makeNSView(context: Context) -> BodyNSTextView {
+        let view = BodyNSTextView(usingTextLayoutManager: true)
         view.isRichText = false
         view.allowsUndo = true
         view.drawsBackground = false
@@ -30,59 +34,129 @@ struct BodyTextView: NSViewRepresentable {
         view.isAutomaticDashSubstitutionEnabled = false
         view.isAutomaticTextReplacementEnabled = false
         view.isContinuousSpellCheckingEnabled = true
-
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 5
-        view.defaultParagraphStyle = paragraph
-        view.typingAttributes = [
-            .font: NSFont.monospacedSystemFont(ofSize: 14, weight: .regular),
-            .foregroundColor: NSColor.labelColor,
-            .paragraphStyle: paragraph,
-        ]
         view.string = text
-        view.textStorage?.setAttributes(view.typingAttributes, range: NSRange(location: 0, length: (text as NSString).length))
         view.delegate = context.coordinator
+        view.onImageFiles = { [weak coordinator = context.coordinator] files, index in
+            coordinator?.insertPhotos(files, at: index) ?? false
+        }
+        context.coordinator.view = view
+        context.coordinator.restyle()
         return view
     }
 
-    func updateNSView(_ view: NSTextView, context: Context) {
-        context.coordinator.parent = self
-        guard view.string != text else { return }
-        view.string = text
-        view.textStorage?.setAttributes(view.typingAttributes, range: NSRange(location: 0, length: (text as NSString).length))
+    func updateNSView(_ view: BodyNSTextView, context: Context) {
+        let coordinator = context.coordinator
+        let modeChanged = coordinator.parent.mode != mode
+        coordinator.parent = self
+        if view.string != text {
+            view.string = text
+            coordinator.restyle()
+        } else if modeChanged {
+            coordinator.restyle()
+        }
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView view: NSTextView, context: Context) -> CGSize? {
-        guard let width = proposal.width, width.isFinite, width > 0 else { return nil }
-        let height = context.coordinator.height(of: text, width: width, attributes: view.typingAttributes)
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView view: BodyNSTextView, context: Context) -> CGSize? {
+        guard let width = proposal.width, width.isFinite, width > 0, let storage = view.textStorage else { return nil }
+        let height = context.coordinator.height(of: storage, width: width)
         return CGSize(width: width, height: max(height, minHeight))
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
+    @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: BodyTextView
+        weak var view: BodyNSTextView?
         /// The last measurement. SwiftUI asks for the same size many times.
-        private var measured: (text: String, width: CGFloat, height: CGFloat)?
+        private var measured: (text: String, mode: BodyMode, width: CGFloat, height: CGFloat)?
 
         init(_ parent: BodyTextView) { self.parent = parent }
 
-        func height(of text: String, width: CGFloat, attributes: [NSAttributedString.Key: Any]) -> CGFloat {
-            if let measured, measured.width == width, measured.text == text { return measured.height }
-            let font = attributes[.font] as? NSFont ?? .systemFont(ofSize: 14)
-            let box = NSAttributedString(string: text, attributes: attributes)
-                .boundingRect(with: NSSize(width: width, height: .greatestFiniteMagnitude),
-                              options: [.usesLineFragmentOrigin, .usesFontLeading])
+        func restyle() {
+            guard let view, let storage = view.textStorage else { return }
+            MarkdownStyler.style(storage, mode: parent.mode)
+            view.typingAttributes = MarkdownStyler.baseAttributes(parent.mode)
+            measured = nil
+        }
+
+        func height(of storage: NSTextStorage, width: CGFloat) -> CGFloat {
+            if let measured, measured.width == width, measured.mode == parent.mode, measured.text == storage.string {
+                return measured.height
+            }
+            let copy = NSAttributedString(attributedString: storage)
+            let box = copy.boundingRect(with: NSSize(width: width, height: .greatestFiniteMagnitude),
+                                        options: [.usesLineFragmentOrigin, .usesFontLeading])
             // One spare line, so a trailing newline has room and the caret
             // never sits on the bottom edge.
-            let height = ceil(box.height + font.boundingRectForFont.height + 8)
-            measured = (text, width, height)
+            let line = MarkdownStyler.baseFont(parent.mode).boundingRectForFont.height
+            let height = ceil(box.height + line + 8)
+            measured = (storage.string, parent.mode, width, height)
             return height
         }
 
         func textDidChange(_ notification: Notification) {
-            guard let view = notification.object as? NSTextView else { return }
+            guard let view else { return }
             parent.text = view.string
+            restyle()
         }
+
+        /// Puts a placeholder where each photo was dropped, then swaps in its
+        /// markdown once it's processed and uploaded.
+        func insertPhotos(_ files: [URL], at index: Int) -> Bool {
+            guard let view, let upload = parent.uploadPhoto else { return false }
+            var at = index
+            for file in files {
+                let token = "![Uploading \(file.lastPathComponent)…](canteiro-upload-\(UUID().uuidString.prefix(8)))"
+                let text = view.string as NSString
+                // A photo sits in its own paragraph, so it can take a caption.
+                let before = at > 0 && text.character(at: at - 1) != 10 ? "\n\n" : ""
+                let after = at < text.length && text.character(at: at) != 10 ? "\n\n" : ""
+                let inserted = before + token + after
+                replace(NSRange(location: at, length: 0), with: inserted)
+                at += (inserted as NSString).length
+                Task { @MainActor in
+                    do {
+                        let markdown = try await upload(file)
+                        self.swap(token, for: markdown)
+                    } catch {
+                        self.swap(token, for: "")
+                        self.parent.onError?("\(file.lastPathComponent): \(error.localizedDescription)")
+                    }
+                }
+            }
+            return true
+        }
+
+        private func swap(_ token: String, for replacement: String) {
+            guard let view else { return }
+            let range = (view.string as NSString).range(of: token)
+            guard range.location != NSNotFound else { return }
+            replace(range, with: replacement)
+        }
+
+        /// An undoable edit that SwiftUI hears about.
+        private func replace(_ range: NSRange, with string: String) {
+            guard let view, view.shouldChangeText(in: range, replacementString: string) else { return }
+            view.textStorage?.replaceCharacters(in: range, with: string)
+            view.didChangeText()
+        }
+    }
+}
+
+/// An NSTextView that hands dropped photos to the app instead of inserting
+/// their file paths.
+final class BodyNSTextView: NSTextView {
+    var onImageFiles: (([URL], Int) -> Bool)?
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self],
+                                                         options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        let photos = urls.filter { UTType(filenameExtension: $0.pathExtension)?.conforms(to: .image) == true }
+        if !photos.isEmpty, let onImageFiles {
+            let index = characterIndexForInsertion(at: convert(sender.draggingLocation, from: nil))
+            if onImageFiles(photos, index) { return true }
+        }
+        return super.performDragOperation(sender)
     }
 }

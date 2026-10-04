@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 @testable import Canteiro
@@ -83,5 +84,34 @@ import Testing
         #expect(lines[3].range(of: #"^date: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$"#, options: .regularExpression) != nil)
         #expect(lines[4] == "language: en")
         #expect(new.data["date"]?.date != nil)
+    }
+
+    @Test(.enabled(if: SiteStore.isSite(site)))
+    func aDroppedEpisodeBecomesADraft() async throws {
+        let copy = try scratchSite()
+        defer { try? FileManager.default.removeItem(at: copy) }
+        let store = SiteStore()
+        await store.open(copy)
+        let item = try #require(store.schema?.item("episodes-corrixeme"))
+        #expect(store.isEpisodes(item))
+
+        try store.addEpisode(item, slug: "corrixeme-001", number: 1, seconds: 768.4,
+                             audioURL: "https://media.amongthestones.com/podcasts/corrixeme/corrixeme-001.mp3")
+        let entry = try #require(store.entries["episodes-corrixeme"]?.first { $0.slug == "corrixeme-001" })
+        #expect(entry.id == "src/content/episodes/corrixeme/corrixeme-001.md")
+        #expect(entry.data["title"] == .string("Episode 1"))
+        #expect(entry.data["draft"] == .bool(true))
+        #expect(entry.data["guid"] == .string("corrixeme-1"))
+        #expect(entry.data["duration"] == .string("00:12:48"))
+        #expect(entry.data["episodeType"] == .string("full"))
+        #expect(entry.data["fileSize"] == nil, "the README says leave it empty")
+        #expect(entry.data["audioUrl"]?.string?.hasPrefix("https://media.amongthestones.com/") == true)
+    }
+
+    @Test func audioLengthReads() async throws {
+        let file = FileManager.default.temporaryDirectory.appending(path: "canteiro-say-\(UUID().uuidString).m4a")
+        _ = try Subprocess.run("/usr/bin/say", ["-o", file.path, "--data-format=aac", "Bo día"], timeout: 30)
+        let seconds = try await AVURLAsset(url: file).load(.duration).seconds
+        #expect(seconds > 0.3 && seconds < 5)
     }
 }

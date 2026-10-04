@@ -3,6 +3,8 @@ import SwiftUI
 /// One entry's form, built from its schema, with the body under it. Edits
 /// save themselves (see Autosave).
 struct EntryEditor: View {
+    @Environment(SiteStore.self) private var store
+    @AppStorage("bodyMode") private var bodyMode = BodyMode.markdown
     let item: SchemaItem
     let entry: Entry
     @State private var data: FieldValue
@@ -49,7 +51,7 @@ struct EntryEditor: View {
                     Divider()
                 }
                 if item.bodyField != nil {
-                    BodyTextView(text: $text)
+                    BodyTextView(text: $text, mode: bodyMode, uploadPhoto: uploadPhoto, onError: { store.lastError = $0 })
                         .padding(.top, 18)
                 }
             }
@@ -59,6 +61,18 @@ struct EntryEditor: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .autosave(item, id: entry.id, data: data, body: item.bodyField == nil ? nil : text)
+    }
+}
+
+extension EntryEditor {
+    /// A dropped photo: resized, WebP, no location, onto R2, as markdown.
+    private var uploadPhoto: @MainActor (URL) async throws -> String {
+        { [store] file in
+            let result = try await Task.detached { try PhotoProcessor.process(file) }.value
+            let url = try await store.upload(result.file, key: PhotoProcessor.key(for: file), contentType: "image/webp",
+                                             name: file.lastPathComponent)
+            return "![](\(url))"
+        }
     }
 }
 
