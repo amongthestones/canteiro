@@ -56,7 +56,7 @@ struct EntryEditor: View {
                         .lineSpacing(5)
                         .scrollDisabled(true)
                         .scrollContentBackground(.hidden)
-                        .frame(minHeight: 320)
+                        .frame(maxWidth: .infinity, minHeight: 320, alignment: .topLeading)
                         .padding(.top, 18)
                 }
             }

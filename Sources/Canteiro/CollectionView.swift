@@ -14,18 +14,22 @@ struct CollectionView: View {
 
     var body: some View {
         @Bindable var store = store
-        HSplitView {
+        // A fixed-width list, like Mail's. HSplitView sized it from its
+        // largest allowed width and squeezed the sidebar off the window.
+        HStack(spacing: 0) {
             List(selection: $store.selectedEntry[item.key]) {
                 ForEach(entries) { entry in
                     EntryRow(entry: entry, item: item).tag(entry.id)
                 }
             }
-            .frame(minWidth: 240, idealWidth: 320, maxWidth: 440)
+            .frame(width: 320)
             .overlay {
                 if entries.isEmpty {
                     ContentUnavailableView(search.isEmpty ? "No Entries" : "No Matches", systemImage: SidebarView.icon(for: item))
                 }
             }
+
+            Divider()
 
             Group {
                 if let id = store.selectedEntry[item.key], let entry = store.entries[item.key]?.first(where: { $0.id == id }) {
@@ -34,7 +38,7 @@ struct CollectionView: View {
                     ContentUnavailableView("No Entry Selected", systemImage: SidebarView.icon(for: item))
                 }
             }
-            .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationSubtitle("\(item.label) · \(store.entries[item.key]?.count ?? 0)")
         .searchable(text: $search, placement: .toolbar, prompt: "Search \(item.label)")

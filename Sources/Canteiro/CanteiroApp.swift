@@ -13,6 +13,7 @@ struct CanteiroApp: App {
                 .frame(minWidth: 960, minHeight: 600)
                 .task { await store.restore() }
         }
+        .defaultSize(width: 1280, height: 820)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Open Site…") { store.chooseSite() }
