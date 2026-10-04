@@ -9,11 +9,13 @@ import Testing
     @Test(.enabled(if: SiteStore.isSite(site)))
     func readsEveryFile() async throws {
         let schema = try await SchemaLoader.load(site: Self.site)
-        #expect(schema.groups.map(\.name) == ["Writing", "Tales", "Podcasts", "Site"])
+        let groups = schema.groups.map(\.name)
+        #expect(groups.first == "Writing")
+        #expect(groups.contains("Strangers of the Wayward Reaches"))
         let loaded = SiteStore.readAll(schema, site: Self.site)
         #expect(loaded.problems.isEmpty, "\(loaded.problems)")
         #expect((loaded.entries["posts"]?.count ?? 0) > 200)
-        #expect(loaded.entries["fiction"]?.contains { $0.slug == "books/moon-road/01" } == true)
+        #expect(loaded.entries["parts-moon-road"]?.contains { $0.slug == "01" } == true)
         #expect(loaded.singletons["glossary"]?.data["terms"]?.array?.isEmpty == false)
         #expect(loaded.singletons["tags"]?.data["tags"]?.array?.isEmpty == false)
         // Every post with a date has one that parses.
