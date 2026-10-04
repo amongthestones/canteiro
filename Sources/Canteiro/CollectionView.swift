@@ -103,13 +103,30 @@ struct SingletonView: View {
     var body: some View {
         Group {
             if let entry = store.singletons[item.key] {
-                EntryEditor(item: item, entry: entry)
+                SingletonEditor(item: item, entry: entry)
             } else {
                 ContentUnavailableView("Not Made Yet", systemImage: "doc.badge.plus",
                                        description: Text("\(item.path).\(item.fileExtension) doesn't exist yet."))
             }
         }
         .navigationSubtitle(item.label)
+    }
+}
+
+/// A singleton's settings, edited in memory for now (saving comes next).
+struct SingletonEditor: View {
+    let item: SchemaItem
+    let entry: Entry
+    @State private var data: FieldValue
+
+    init(item: SchemaItem, entry: Entry) {
+        self.item = item
+        self.entry = entry
+        _data = State(initialValue: entry.data)
+    }
+
+    var body: some View {
+        SettingsForm(fields: item.dataFields, data: $data)
     }
 }
 

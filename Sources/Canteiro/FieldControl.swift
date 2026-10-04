@@ -2,14 +2,15 @@ import SwiftUI
 
 /// One field's control, picked by its Keystatic type.
 struct FieldControl: View {
+    @Environment(\.inSettingsForm) private var inSettingsForm
     let spec: FieldSpec
     @Binding var value: FieldValue
     var slug: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: inSettingsForm ? .trailing : .leading, spacing: 4) {
             control
-            if let description = spec.description, spec.type != "checkbox" {
+            if let description = spec.description, spec.type != "checkbox", !inSettingsForm {
                 Text(description)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -23,7 +24,7 @@ struct FieldControl: View {
         switch spec.type {
         case "slug":
             VStack(alignment: .leading, spacing: 3) {
-                TextField(spec.title, text: stringBinding)
+                TextField(spec.title, text: stringBinding, prompt: Text(Placeholder.text(for: spec)))
                     .textFieldStyle(.plain)
                     .labelsHidden()
                 if let slug {
@@ -35,17 +36,18 @@ struct FieldControl: View {
         case "text", "url":
             TextInput(spec: spec, text: stringBinding)
         case "integer":
-            TextField(spec.title, value: intBinding, format: .number.grouping(.never))
+            TextField(spec.title, value: intBinding, format: .number.grouping(.never), prompt: Text(Placeholder.text(for: spec)))
                 .textFieldStyle(.plain)
                 .labelsHidden()
-                .frame(maxWidth: 140, alignment: .leading)
+                .multilineTextAlignment(inSettingsForm ? .trailing : .leading)
+                .frame(maxWidth: 140, alignment: inSettingsForm ? .trailing : .leading)
         case "checkbox":
             HStack(spacing: 10) {
                 Toggle(spec.title, isOn: boolBinding)
                     .toggleStyle(.switch)
                     .controlSize(.small)
                     .labelsHidden()
-                if let description = spec.description {
+                if let description = spec.description, !inSettingsForm {
                     Text(description).font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -91,16 +93,18 @@ struct FieldControl: View {
 
 /// A text field, growing for multiline ones, with a count when there's a limit.
 struct TextInput: View {
+    @Environment(\.inSettingsForm) private var inSettingsForm
     let spec: FieldSpec
     @Binding var text: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: inSettingsForm ? .trailing : .leading, spacing: 3) {
             if spec.multiline == true {
-                TextField(spec.title, text: $text, axis: .vertical)
+                TextField(spec.title, text: $text, prompt: Text(Placeholder.text(for: spec)), axis: .vertical)
                     .lineLimit(1...12)
             } else {
-                TextField(spec.title, text: $text)
+                TextField(spec.title, text: $text, prompt: Text(Placeholder.text(for: spec)))
+                    .multilineTextAlignment(inSettingsForm ? .trailing : .leading)
             }
             if let max = spec.maxLength {
                 Text("\(text.count) / \(max)")
@@ -301,6 +305,15 @@ struct ConditionalField: View {
                 }
             }
         }
+    }
+}
+
+/// What an empty field says. The field's own label read as a value
+/// ("Description" in the Description field), so say whether it's needed.
+enum Placeholder {
+    static func text(for spec: FieldSpec) -> String {
+        let required = spec.validation?.isRequired == true || (spec.validation?.length?.min ?? 0) > 0
+        return required ? "Required" : "Optional"
     }
 }
 
