@@ -5,6 +5,7 @@ struct CollectionView: View {
     @Environment(SiteStore.self) private var store
     let item: SchemaItem
     @State private var search = ""
+    @AppStorage("listWidth") private var listWidth = 320.0
 
     private var entries: [Entry] {
         let all = store.entries[item.key] ?? []
@@ -14,22 +15,22 @@ struct CollectionView: View {
 
     var body: some View {
         @Bindable var store = store
-        // A fixed-width list, like Mail's. HSplitView sized it from its
-        // largest allowed width and squeezed the sidebar off the window.
+        // The list keeps the width you drag it to, like Mail's. (HSplitView
+        // sized it from its largest allowed width and squeezed the sidebar.)
         HStack(spacing: 0) {
             List(selection: $store.selectedEntry[item.key]) {
                 ForEach(entries) { entry in
                     EntryRow(entry: entry, item: item).tag(entry.id)
                 }
             }
-            .frame(width: 320)
+            .frame(width: listWidth)
             .overlay {
                 if entries.isEmpty {
                     ContentUnavailableView(search.isEmpty ? "No Entries" : "No Matches", systemImage: SidebarView.icon(for: item))
                 }
             }
 
-            Divider()
+            ResizeHandle(width: $listWidth, range: 240...520)
 
             Group {
                 if let id = store.selectedEntry[item.key], let entry = store.entries[item.key]?.first(where: { $0.id == id }) {
@@ -109,5 +110,33 @@ struct SingletonView: View {
             }
         }
         .navigationSubtitle(item.label)
+    }
+}
+
+/// A divider you can drag, with the column-resize pointer, like the edge
+/// between Mail's list and message.
+struct ResizeHandle: View {
+    @Binding var width: Double
+    let range: ClosedRange<Double>
+    @State private var start: Double?
+
+    var body: some View {
+        Divider()
+            .overlay {
+                Color.clear
+                    .frame(width: 9)
+                    .contentShape(Rectangle())
+                    .pointerStyle(.columnResize)
+                    .gesture(
+                        DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                            .onChanged { drag in
+                                let from = start ?? width
+                                start = from
+                                width = min(max(from + drag.translation.width, range.lowerBound), range.upperBound)
+                            }
+                            .onEnded { _ in start = nil }
+                    )
+            }
+            .accessibilityHidden(true)
     }
 }
