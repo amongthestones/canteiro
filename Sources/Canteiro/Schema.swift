@@ -165,6 +165,12 @@ final class FieldSpec: Decodable, Sendable, Identifiable {
     let maxItems: Int?
     /// The default when it's a plain string (a select's "en").
     let defaultString: String?
+    /// The config's other defaults: a list's (a post's kind), a number's
+    /// (chapter 1), a switch's, and a date's "now" or "today".
+    let defaultStrings: [String]?
+    let defaultInt: Int?
+    let defaultBool: Bool?
+    let defaultKind: String?
 
     var id: String { key }
     /// Keystatic's conditional has no label of its own; its menu has one.
@@ -196,6 +202,11 @@ final class FieldSpec: Decodable, Sendable, Identifiable {
         slug = try? c.decodeIfPresent(SubLabel.self, forKey: .slug)
         maxItems = try c.decodeIfPresent(Int.self, forKey: .maxItems)
         defaultString = try? c.decodeIfPresent(String.self, forKey: .defaultValue)
+        defaultStrings = try? c.decodeIfPresent([String].self, forKey: .defaultValue)
+        defaultInt = try? c.decodeIfPresent(Int.self, forKey: .defaultValue)
+        defaultBool = try? c.decodeIfPresent(Bool.self, forKey: .defaultValue)
+        struct Kind: Decodable { let kind: String }
+        defaultKind = (try? c.decodeIfPresent(Kind.self, forKey: .defaultValue))?.kind
     }
 
     var maxLength: Int? { validation?.length?.max }

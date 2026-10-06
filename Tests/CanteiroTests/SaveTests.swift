@@ -108,6 +108,62 @@ import Testing
         #expect(entry.data["audioUrl"]?.string?.hasPrefix("https://media.amongthestones.com/") == true)
     }
 
+    @Test(.enabled(if: SiteStore.isSite(site)))
+    func trashingAnEntryMovesTheNextOneUp() async throws {
+        let copy = try scratchSite()
+        defer { try? FileManager.default.removeItem(at: copy) }
+        let store = SiteStore()
+        await store.open(copy)
+        let item = try #require(store.schema?.item("posts"))
+        let list = try #require(store.entries["posts"])
+        let (first, second) = (list[0], list[1])
+        store.selectedEntry["posts"] = first.id
+
+        let trashed = store.trash(item, ids: [first.id])
+        defer { for url in trashed { try? FileManager.default.removeItem(at: url) } }
+        #expect(trashed.count == 1)
+        #expect(!FileManager.default.fileExists(atPath: first.url.path))
+        #expect(store.entries["posts"]?.count == list.count - 1)
+        #expect(store.selectedEntry["posts"] == second.id)
+    }
+
+    @Test(.enabled(if: SiteStore.isSite(site)))
+    func aNewPostStartsAsADraftWithTheConfigDefaults() async throws {
+        let copy = try scratchSite()
+        defer { try? FileManager.default.removeItem(at: copy) }
+        let store = SiteStore()
+        await store.open(copy)
+        let item = try #require(store.schema?.item("posts"))
+        try store.createEntry(item, title: "  Jimmy's Røde mic, in Monforte ")
+
+        let entry = try #require(store.entries["posts"]?.first { $0.id == store.selectedEntry["posts"] })
+        #expect(entry.slug == "jimmys-rode-mic-in-monforte")
+        #expect(entry.data["title"] == .string("Jimmy's Røde mic, in Monforte"))
+        #expect(entry.data["draft"] == .bool(true))
+        #expect(entry.data["categories"] == .array([.string("posts")]))
+        #expect(entry.data["language"] == .string("en"))
+        #expect(entry.data["date"]?.date != nil)
+        #expect(entry.body == "")
+    }
+
+    @Test(.enabled(if: SiteStore.isSite(site)))
+    func aNewWorkAndChapterGetTheirDefaults() async throws {
+        let copy = try scratchSite()
+        defer { try? FileManager.default.removeItem(at: copy) }
+        let store = SiteStore()
+        await store.open(copy)
+        try store.createEntry(try #require(store.schema?.item("works")), title: "The Long Field")
+        let work = try #require(store.entries["works"]?.first { $0.id == store.selectedEntry["works"] })
+        #expect(work.data["series"]?["discriminant"] == .string("stories"))
+        #expect(work.data["series"]?["value"] == .string("short"))
+
+        try store.createEntry(try #require(store.schema?.item("fiction")), title: "The Long Field")
+        let part = try #require(store.entries["fiction"]?.first { $0.id == store.selectedEntry["fiction"] })
+        #expect(part.data["part"] == .int(1))
+        #expect(part.data["draft"] == .bool(true))
+        #expect(part.data["date"]?.string?.count == 10)
+    }
+
     @Test func audioLengthReads() async throws {
         let file = FileManager.default.temporaryDirectory.appending(path: "canteiro-say-\(UUID().uuidString).m4a")
         _ = try Subprocess.run("/usr/bin/say", ["-o", file.path, "--data-format=aac", "Bo día"], timeout: 30)

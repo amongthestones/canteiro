@@ -78,8 +78,10 @@ enum PhotoProcessor {
 /// File names for the web: lowercase ASCII, words joined by hyphens.
 enum Slug {
     static func make(_ text: String) -> String {
-        let ascii = text.applyingTransform(.toLatin, reverse: false)?.applyingTransform(.stripDiacritics, reverse: false) ?? text
-        let words = ascii.lowercased().split { !$0.isLetter && !$0.isNumber }
+        // Latin-ASCII spells out what stripping accents can't: ø as o, ß as ss.
+        let ascii = text.applyingTransform(StringTransform("Any-Latin; Latin-ASCII"), reverse: false) ?? text
+        // "Jimmy's" is jimmys, as Keystatic makes it, not jimmy-s.
+        let words = ascii.lowercased().replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "\u{2019}", with: "").split { !$0.isLetter && !$0.isNumber }
         let slug = words.joined(separator: "-").filter { $0.isASCII }
         return slug.isEmpty ? "file" : slug
     }

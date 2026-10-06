@@ -49,6 +49,8 @@ struct CanteiroApp: App {
             SaveCommand()
             BodyModeCommand()
             CommandGroup(replacing: .newItem) {
+                NewEntryButton(inMenu: true)
+                    .environment(store)
                 NewAsideButton()
                 Divider()
                 Button("Open Site…") { store.chooseSite() }

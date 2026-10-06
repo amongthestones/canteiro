@@ -54,6 +54,7 @@ struct ContentView: View {
         }
         .navigationTitle(store.siteName)
         .sheet(isPresented: $showPublish) { PublishSheet() }
+        .sheet(item: $store.newEntryItem) { NewEntrySheet(item: $0) }
         .onReceive(NotificationCenter.default.publisher(for: AsideHotKey.pressed)) { _ in
             NSApp.activate()
             openWindow(id: "aside")

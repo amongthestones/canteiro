@@ -40,6 +40,8 @@ final class SiteStore {
     private(set) var revisions: [Entry.ID: Int] = [:]
 
     var selectedItem: String?
+    /// The collection a New Entry sheet is open for.
+    var newEntryItem: SchemaItem?
     var selectedEntry: [String: Entry.ID] = [:]
 
     private static let siteKey = "sitePath"
@@ -225,20 +227,84 @@ final class SiteStore {
         return entry
     }
 
-    /// A new entry's fields in schema order: the given values, then for each
-    /// field the site needs (required ones, switches, menus) its default.
-    func newData(_ item: SchemaItem, _ values: [String: FieldValue]) -> FieldValue {
-        var pairs: [FieldPair] = []
-        for field in item.dataFields {
-            if let value = values[field.key] {
-                pairs.append(FieldPair(key: field.key, value: value))
-            } else if field.type == "checkbox" {
-                pairs.append(FieldPair(key: field.key, value: .bool(false)))
-            } else if field.type == "select", let value = field.defaultString ?? field.options?.first?.value {
-                pairs.append(FieldPair(key: field.key, value: .string(value)))
+    /// Moves entries' files to the Trash, so a slip can be put back from
+    /// there (or from git until it's published). The next entry in the
+    /// list takes the selection. Returns where the files went.
+    @discardableResult
+    func trash(_ item: SchemaItem, ids: Set<Entry.ID>) -> [URL] {
+        guard item.kind == .collection, let list = entries[item.key] else { return [] }
+        var gone: Set<Entry.ID> = []
+        var trashed: [URL] = []
+        for entry in list where ids.contains(entry.id) {
+            do {
+                var moved: NSURL?
+                try FileManager.default.trashItem(at: entry.url, resultingItemURL: &moved)
+                if let moved { trashed.append(moved as URL) }
+                gone.insert(entry.id)
+            } catch {
+                lastError = "\(entry.url.lastPathComponent): \(error.localizedDescription)"
             }
         }
-        return .object(pairs)
+        guard !gone.isEmpty else { return trashed }
+        if let selected = selectedEntry[item.key], gone.contains(selected),
+           let index = list.firstIndex(where: { $0.id == selected }) {
+            let next = list[index...].first { !gone.contains($0.id) } ?? list[..<index].last { !gone.contains($0.id) }
+            selectedEntry[item.key] = next?.id
+        }
+        entries[item.key] = list.filter { !gone.contains($0.id) }
+        for id in gone {
+            conflicts.remove(id)
+            saveErrors[id] = nil
+        }
+        saveCount += 1
+        refreshChanges()
+        return trashed
+    }
+
+    /// A new entry's fields in schema order: the given values, then each
+    /// field's default from the config (a post's kind, chapter 1, a date of
+    /// now), as Keystatic fills a new entry in.
+    func newData(_ item: SchemaItem, _ values: [String: FieldValue]) -> FieldValue {
+        .object(item.dataFields.compactMap { field in
+            (values[field.key] ?? Self.initial(field)).map { FieldPair(key: field.key, value: $0) }
+        })
+    }
+
+    /// A field's value in a new entry, or nil to leave it out of the file.
+    nonisolated static func initial(_ field: FieldSpec) -> FieldValue? {
+        switch field.type {
+        case "checkbox":
+            return .bool(field.defaultBool ?? false)
+        case "select":
+            return (field.defaultString ?? field.options?.first?.value).map(FieldValue.string)
+        case "multiselect":
+            guard let list = field.defaultStrings, !list.isEmpty else { return nil }
+            return .array(list.map(FieldValue.string))
+        case "integer":
+            return field.defaultInt.map(FieldValue.int)
+        case "date", "datetime":
+            return field.defaultKind == nil ? nil : dateValue(.now, type: field.type)
+        case "text":
+            return field.defaultString.map(FieldValue.string)
+        case "conditional":
+            guard let menu = field.discriminant, let picked = initial(menu)?.string else { return nil }
+            let sub = field.values?.first { $0.key == picked }
+            return .object([FieldPair(key: "discriminant", value: .string(picked)),
+                            FieldPair(key: "value", value: sub.flatMap(initial) ?? .null)])
+        default:
+            return nil
+        }
+    }
+
+    /// A new entry named by its title: the file is the title as a slug,
+    /// the config's defaults are filled in, and it starts as a draft, so a
+    /// publish can't put it on the site half-written.
+    func createEntry(_ item: SchemaItem, title: String) throws {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        var values: [String: FieldValue] = [:]
+        if let slugField = item.slugField { values[slugField] = .string(title) }
+        if item.dataFields.contains(where: { $0.key == "draft" && $0.type == "checkbox" }) { values["draft"] = .bool(true) }
+        try create(item, slug: Slug.make(title), data: newData(item, values), body: item.bodyField == nil ? nil : "")
     }
 
     /// The first dated stream of short text: the asides.

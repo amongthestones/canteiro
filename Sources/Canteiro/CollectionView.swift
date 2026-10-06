@@ -28,6 +28,17 @@ struct CollectionView: View {
                     EntryRow(entry: entry, item: item).tag(entry.id)
                 }
             }
+            .contextMenu(forSelectionType: Entry.ID.self) { ids in
+                if !ids.isEmpty {
+                    Button("Move to Trash", systemImage: "trash", role: .destructive) {
+                        store.trash(item, ids: ids)
+                    }
+                }
+            }
+            // The Delete key and Edit › Delete, as in Mail and Notes.
+            .onDeleteCommand {
+                if let id = store.selectedEntry[item.key] { store.trash(item, ids: [id]) }
+            }
             .frame(width: listWidth)
             .dropDestination(for: URL.self) { urls, _ in
                 let audio = urls.filter { UTType(filenameExtension: $0.pathExtension)?.conforms(to: .audio) == true }
@@ -54,6 +65,9 @@ struct CollectionView: View {
             .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationSubtitle("\(item.label) · \(store.entries[item.key]?.count ?? 0)")
+        .toolbar {
+            ToolbarItem(placement: .navigation) { NewEntryButton() }
+        }
         .searchable(text: $search, placement: .toolbar, prompt: "Search \(item.label)")
         .onAppear {
             if store.selectedEntry[item.key] == nil { store.selectedEntry[item.key] = entries.first?.id }
