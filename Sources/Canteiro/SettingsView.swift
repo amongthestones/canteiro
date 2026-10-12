@@ -41,7 +41,7 @@ struct SettingsView: View {
                     case .idle: EmptyView()
                     case .checking: ProgressView().controlSize(.small)
                     case .ok: Label("Connected", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                    case .failed(let message): Label(message, systemImage: "xmark.octagon.fill").foregroundStyle(.red).lineLimit(3)
+                    case .failed(let message): Label(message, systemImage: "xmark.octagon.fill").foregroundStyle(.red).textSelection(.enabled)
                     }
                     Spacer()
                     Button("Save and Check") { saveAndCheck() }
@@ -55,11 +55,11 @@ struct SettingsView: View {
     }
 
     private func saveAndCheck() {
-        R2Settings.accountID = accountID.trimmingCharacters(in: .whitespaces)
-        R2Settings.bucket = bucket.trimmingCharacters(in: .whitespaces)
-        R2Settings.publicBase = publicBase.trimmingCharacters(in: .whitespaces)
-        R2Settings.accessKeyID = accessKeyID.trimmingCharacters(in: .whitespaces)
-        R2Settings.secretAccessKey = secret.trimmingCharacters(in: .whitespaces)
+        R2Settings.accountID = accountID.trimmingCharacters(in: .whitespacesAndNewlines)
+        R2Settings.bucket = bucket.trimmingCharacters(in: .whitespacesAndNewlines)
+        R2Settings.publicBase = publicBase.trimmingCharacters(in: .whitespacesAndNewlines)
+        R2Settings.accessKeyID = accessKeyID.trimmingCharacters(in: .whitespacesAndNewlines)
+        R2Settings.secretAccessKey = secret.trimmingCharacters(in: .whitespacesAndNewlines)
         status = .checking
         Task {
             do {

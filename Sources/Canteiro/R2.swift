@@ -73,7 +73,21 @@ struct R2Client: Sendable {
         var errorDescription: String? {
             switch self {
             case .notSetUp: return "R2 isn't set up. Add the bucket and keys in Settings (⌘,)."
-            case .rejected(let code, let body): return "R2 said \(code): \(body)"
+            case .rejected(let code, let body): return "R2 said \(code): \(Self.message(in: body))"
+            }
+        }
+
+        /// R2 answers in S3's XML. Its Message says what was wrong (a key of
+        /// the wrong length, a missing bucket), so show that, not the XML.
+        static func message(in body: String) -> String {
+            func tag(_ name: String) -> String? {
+                guard let start = body.range(of: "<\(name)>"), let end = body.range(of: "</\(name)>", range: start.upperBound..<body.endIndex) else { return nil }
+                return String(body[start.upperBound..<end.lowerBound])
+            }
+            switch (tag("Code"), tag("Message")) {
+            case let (code?, message?): return "\(code). \(message)"
+            case let (code?, nil): return code
+            default: return body
             }
         }
     }
@@ -107,7 +121,7 @@ struct R2Client: Sendable {
         let (body, response) = try await URLSession.shared.upload(for: request, from: data, delegate: watcher)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(code) else {
-            throw Failure.rejected(code, String(decoding: body, as: UTF8.self).prefix(300).description)
+            throw Failure.rejected(code, String(decoding: body, as: UTF8.self))
         }
         progress(1)
     }
@@ -124,7 +138,7 @@ struct R2Client: Sendable {
         let (body, response) = try await URLSession.shared.data(for: request)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(code) else {
-            throw Failure.rejected(code, String(decoding: body, as: UTF8.self).prefix(300).description)
+            throw Failure.rejected(code, String(decoding: body, as: UTF8.self))
         }
     }
 }
