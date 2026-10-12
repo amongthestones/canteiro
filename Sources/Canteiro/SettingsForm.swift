@@ -75,34 +75,41 @@ private struct SettingsList: View {
         let element = spec.element!
         let count = value.array?.count ?? 0
         if element.type == "object" {
-            // The list's title heads its first item (or the Add button when
-            // it's empty), so no section is left standing empty.
+            // A footer under each item broke the first item's box, so
+            // Remove is a row inside it. The list's title heads the first
+            // item, or the Add button when the list is empty.
             ForEach(0..<count, id: \.self) { index in
-                Section {
-                    ForEach(element.fields ?? []) { child in
-                        SettingsRow(spec: child, value: $value.item(index).child(child.key))
+                if index == 0 {
+                    Section {
+                        itemRows(element, index)
+                        removeRow(index)
+                    } header: {
+                        SectionHeader(title: title, description: spec.description)
                     }
-                } header: {
-                    if index == 0 { SectionHeader(title: title, description: spec.description) }
-                } footer: {
-                    HStack {
-                        Spacer()
-                        Button("Remove", role: .destructive) { remove(index) }
-                            .buttonStyle(.link)
-                            .font(.caption)
+                } else {
+                    Section {
+                        itemRows(element, index)
+                        removeRow(index)
                     }
                 }
             }
-            Section {
-                addButton(element)
-            } header: {
-                if count == 0 { SectionHeader(title: title, description: spec.description) }
+            if count == 0 {
+                Section {
+                    addButton(element)
+                } header: {
+                    SectionHeader(title: title, description: spec.description)
+                }
+            } else {
+                Section {
+                    addButton(element)
+                }
             }
         } else {
             Section {
                 ForEach(0..<count, id: \.self) { index in
                     HStack {
                         FieldControl(spec: element, value: $value.item(index))
+                        Spacer()
                         Button { remove(index) } label: { Image(systemName: "minus.circle") }
                             .buttonStyle(.borderless)
                             .foregroundStyle(.secondary)
@@ -113,6 +120,21 @@ private struct SettingsList: View {
             } header: {
                 SectionHeader(title: title, description: spec.description)
             }
+        }
+    }
+
+    private func itemRows(_ element: FieldSpec, _ index: Int) -> some View {
+        ForEach(element.fields ?? []) { child in
+            SettingsRow(spec: child, value: $value.item(index).child(child.key))
+        }
+    }
+
+    private func removeRow(_ index: Int) -> some View {
+        HStack {
+            Spacer()
+            Button("Remove", role: .destructive) { remove(index) }
+                .buttonStyle(.link)
+                .font(.caption)
         }
     }
 

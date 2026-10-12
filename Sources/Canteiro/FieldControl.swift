@@ -44,9 +44,8 @@ struct FieldControl: View {
             TextInput(spec: spec, text: stringBinding)
         case "integer":
             TextField(spec.title, value: intBinding, format: .number.grouping(.never), prompt: Text(Placeholder.text(for: spec)))
-                .textFieldStyle(.plain)
+                .settingsFieldStyle(inSettingsForm)
                 .labelsHidden()
-                .multilineTextAlignment(inSettingsForm ? .trailing : .leading)
                 .frame(maxWidth: 140, alignment: inSettingsForm ? .trailing : .leading)
         case "checkbox":
             HStack(spacing: 10) {
@@ -113,7 +112,6 @@ struct TextInput: View {
                     .lineLimit(1...12)
             } else {
                 TextField(spec.title, text: $text, prompt: Text(Placeholder.text(for: spec)))
-                    .multilineTextAlignment(inSettingsForm ? .trailing : .leading)
             }
             if let max = spec.maxLength {
                 Text("\(text.count) / \(max)")
@@ -121,8 +119,25 @@ struct TextInput: View {
                     .foregroundStyle(text.count > max ? .red : .secondary)
             }
         }
-        .textFieldStyle(.plain)
+        .settingsFieldStyle(inSettingsForm)
+        .frame(maxWidth: inSettingsForm ? 340 : .infinity, alignment: inSettingsForm ? .trailing : .leading)
         .labelsHidden()
+    }
+}
+
+extension View {
+    /// Plain in the entry editor, where the form is the page. In a settings
+    /// form a borderless value on the right read as fixed text, so it gets
+    /// the usual box, with its text from the left like any Mac field.
+    @ViewBuilder
+    func settingsFieldStyle(_ inSettingsForm: Bool) -> some View {
+        if inSettingsForm {
+            // The grouped form right-aligns field text unless told otherwise.
+            textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.leading)
+        } else {
+            textFieldStyle(.plain)
+        }
     }
 }
 
