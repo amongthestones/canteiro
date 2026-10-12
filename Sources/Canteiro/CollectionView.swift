@@ -8,9 +8,10 @@ struct CollectionView: View {
     @State private var search = ""
     @AppStorage("listWidth") private var listWidth = 320.0
     @State private var dropTargeted = false
+    @State private var filter = ListFilter()
 
     private var entries: [Entry] {
-        let all = store.entries[item.key] ?? []
+        let all = (store.entries[item.key] ?? []).filter(filter.matches)
         guard !search.isEmpty else { return all }
         return all.filter { SiteStore.title(of: $0, item: item).localizedCaseInsensitiveContains(search) }
     }
@@ -48,7 +49,7 @@ struct CollectionView: View {
             } isTargeted: { dropTargeted = $0 }
             .overlay {
                 if entries.isEmpty {
-                    ContentUnavailableView(search.isEmpty ? "No Entries" : "No Matches", systemImage: SidebarView.icon(for: item))
+                    ContentUnavailableView(search.isEmpty && !filter.isActive ? "No Entries" : "No Matches", systemImage: SidebarView.icon(for: item))
                 }
             }
 
@@ -64,9 +65,14 @@ struct CollectionView: View {
             }
             .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationSubtitle("\(item.label) · \(store.entries[item.key]?.count ?? 0)")
+        .navigationSubtitle(filter.isActive
+            ? "\(item.label) · \(entries.count) of \(store.entries[item.key]?.count ?? 0)"
+            : "\(item.label) · \(store.entries[item.key]?.count ?? 0)")
         .toolbar {
             ToolbarItem(placement: .navigation) { NewEntryButton() }
+            if ListFilterMenu.applies(to: item) {
+                ToolbarItem(placement: .navigation) { ListFilterMenu(item: item, filter: $filter) }
+            }
         }
         .searchable(text: $search, placement: .toolbar, prompt: "Search \(item.label)")
         .onAppear {
@@ -138,10 +144,12 @@ struct EntryRow: View {
                         Text(dateText).font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                // Always two lines tall, like Mail: the list caches row
+                // heights, so a line that grows while you type got cut in half.
                 Text(subtitle)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .lineLimit(2, reservesSpace: true)
             }
         }
         .padding(.vertical, 3)

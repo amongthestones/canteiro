@@ -7,7 +7,7 @@ the site's Keystatic config, handles photo and episode uploads to R2, and
 commits and pushes to publish.
 
 Status: in daily use. Browse and edit the whole site with forms built from the
-Keystatic config; new entries (⌘N) and Move to Trash; autosave with clean diffs; Markdown and Rich views (⌘R);
+Keystatic config; new entries (⌘N) and Move to Trash; a filter for drafts, published and each choice field; autosave with clean diffs; Markdown and Rich views (⌘R);
 quick asides (⇧⌘A, or ⌃⌥A from any app); photo and MP3 drops that upload to
 R2; a preview window (⌥⌘P); Publish (commit and push).
 
