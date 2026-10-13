@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Makes Canteiro.app and installs it to /Applications. Re-run it after code
-# changes to update the installed app.
+# changes to update the installed app. It's signed with your Developer ID
+# when the keychain has one, so macOS sees each build as the same app and
+# the Keychain doesn't ask again for the R2 keys; ad-hoc otherwise.
 #
 # --release signs it with a Developer ID, has Apple notarize it, and leaves
 # dist/Canteiro-<version>.zip, ready for GitHub Releases. It needs a
@@ -43,6 +45,7 @@ for arg in "$@"; do
       echo "  CANTEIRO_INSTALL_DIR overrides the install location."
       echo "  --release: Developer ID signing, notarizing and a zip in dist/; doesn't install."
       echo "  CANTEIRO_SIGN_ID and CANTEIRO_NOTARY_PROFILE pick the identity and credentials."
+      echo "  CANTEIRO_SIGN_ID=- signs ad-hoc."
       exit 0
       ;;
     *)
@@ -138,15 +141,23 @@ EOF
 EOF
 } > "$CONTENTS/Info.plist"
 
+if [[ -z "$SIGN_ID" ]]; then
+  SIGN_ID="$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)"
+fi
+
 if [[ "$RELEASE" -eq 0 ]]; then
-  # Ad-hoc sign so macOS will launch it from Finder on this machine.
-  codesign --force --sign - --timestamp=none "$APP"
-  echo "Made: $APP (version $VERSION, build $BUILD_NUMBER)"
-else
-  if [[ -z "$SIGN_ID" ]]; then
-    SIGN_ID="$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)"
+  if [[ -n "$SIGN_ID" && "$SIGN_ID" != "-" ]]; then
+    # The same signature as a release, without the timestamp server, so it
+    # works offline. Not notarized, which only matters on other Macs.
+    codesign --force --options runtime --timestamp=none --sign "$SIGN_ID" "$APP"
+    echo "Made: $APP (version $VERSION, build $BUILD_NUMBER), signed with $SIGN_ID"
+  else
+    # Ad-hoc, so macOS will launch it from Finder on this Mac.
+    codesign --force --sign - --timestamp=none "$APP"
+    echo "Made: $APP (version $VERSION, build $BUILD_NUMBER), signed ad-hoc"
   fi
-  if [[ -z "$SIGN_ID" ]]; then
+else
+  if [[ -z "$SIGN_ID" || "$SIGN_ID" == "-" ]]; then
     echo "error: no Developer ID Application certificate in the keychain" >&2
     exit 1
   fi

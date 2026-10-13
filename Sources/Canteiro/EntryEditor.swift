@@ -73,6 +73,7 @@ struct EntryEditor: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .environment(\.guidField, store.isEpisodes(item) ? store.config.guidField : nil)
+        .environment(\.assetPlace, store.siteURL.map { AssetPlace(site: $0, item: item, slug: entry.slug) })
         .autosave(item, id: entry.id, data: data, body: item.bodyField == nil ? nil : lead + text)
     }
 }
@@ -94,6 +95,7 @@ extension EntryEditor {
 /// Label on the left, control on the right, a hairline between rows: the
 /// header of a Mail message.
 struct FieldRows: View {
+    @Environment(\.fieldPath) private var path
     let fields: [FieldSpec]
     @Binding var data: FieldValue
     var slug: String?
@@ -105,8 +107,9 @@ struct FieldRows: View {
                     Text(field.title)
                         .foregroundStyle(.secondary)
                         .frame(minWidth: 96, alignment: .leading)
-                    FieldControl(spec: field, value: $data.child(field.key), slug: slug)
+                    FieldControl(spec: field, value: $data.field(field), slug: slug)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .environment(\.fieldPath, path.map { $0 + [field.key] })
                 }
                 .padding(.vertical, 8)
                 Divider()

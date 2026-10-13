@@ -67,7 +67,7 @@ To run it from the sources without installing:
 swift run
 ```
 
-A copy made this way is signed only for the Mac it was made on, so Gatekeeper will stop it on another one.
+A copy made this way is signed with your Developer ID if your keychain has one, so macOS treats each new build as the same app, and ad-hoc otherwise. Either way it isn't notarized, so Gatekeeper will stop it on another Mac.
 
 To make a signed, notarized release, run `./scripts/package-app.sh --release`. It needs a Developer ID Application certificate in your keychain and notarytool credentials saved once (the script's header shows the command). It leaves `dist/Canteiro-<version>.zip` and takes the version from the latest `v*` tag.
 
@@ -106,9 +106,19 @@ Each Keystatic field type gets a native control:
 | `array` | a list of items you can add to and remove from |
 | `object` | its fields, grouped in a box |
 | `conditional` | a menu that swaps in the fields for each choice |
-| `file`, `image` | shown, not edited |
+| `image`, `file` | the file's name, a preview for an image, and Choose… and Remove. Drop a file on it to use that one. The file is copied into the repo where Keystatic would put it, so either one can edit the entry (see below) |
 
 A field type Canteiro doesn't know is shown as text and left alone. Unknown keys in a file's frontmatter are kept as they are.
+
+Image and file fields follow Keystatic's rules for where the file goes:
+
+- The file is named after the field, keeping its extension: a `cover` field gets `cover.jpg`.
+- With `directory` set, the file goes there, in a folder named after the entry's slug in a collection (`src/assets/posts/my-post/cover.jpg`). Without it, the file goes in a folder next to the entry, named like it.
+- The entry stores `publicPath`, the slug and the file name (`/src/assets/posts/my-post/cover.jpg`), or only the file name when there's no `publicPath`.
+- A replaced file under another name, a removed one, and the files of an entry you move to the Trash all go to the Trash.
+- Inside a list, the field is shown but not edited, since Keystatic names those files by each item.
+
+The new file shows up in Publish with the entry, like any other change. These files are saved into the repo as they are. Photos dropped into the body are different: they're resized and uploaded to R2.
 
 ### The body
 
@@ -309,11 +319,11 @@ Only the editor reads this. How the site renders it is up to the site.
 ## Limits
 
 - **Keystatic only.** A site whose content is described only by Astro's own collection schemas won't open. Canteiro needs `keystatic.config.ts`.
-- **R2 only** for uploads. Other S3 services aren't wired up, and images can't be saved into the repo.
+- **R2 only** for photos dropped into the body. Other S3 services aren't wired up. Image fields save into the repo instead.
 - **One site at a time**, and one person: no accounts, no sharing, no locking.
 - **Mac only.** There's no iPhone or iPad version. The inbox is the way to write on the phone.
 - **No automatic updates.** Download a new release from GitHub when there is one.
-- **Some field types are read-only:** `file`, `image`, and Keystatic's `document` and other rich-content fields. Canteiro shows them and leaves them unchanged.
+- **Some field types are read-only:** Keystatic's `document` and other rich-content fields, and image and file fields inside a list. Canteiro shows them and leaves them unchanged.
 - **Tables in Rich** use the colons for alignment but have no editing tools: you still type the pipes.
 - **Keystatic's `itemLabel` functions** can't be read, so lists use the first text field as the title.
 
@@ -341,6 +351,7 @@ CANTEIRO_TEST_SITE=~/Sites/my-site swift test
 | `FileWriter.swift` | Writes entries back with the smallest change |
 | `ContentView.swift`, `CollectionView.swift` | The sidebar, lists and layout |
 | `EntryEditor.swift`, `FieldControl.swift`, `SettingsForm.swift` | Forms and field controls |
+| `AssetField.swift` | Image and file fields, and where their files go |
 | `BodyTextView.swift`, `MarkdownStyler.swift` | The body editor and its Markdown and Rich views |
 | `Autosave.swift` | Saving and the changed-on-disk bar |
 | `DraftInbox.swift`, `InboxView.swift` | The inbox |

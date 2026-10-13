@@ -7,28 +7,69 @@ import Security
 /// site's, in its canteiro.json.
 enum R2Settings {
     static var accountID: String {
-        get { UserDefaults.standard.string(forKey: "r2AccountID") ?? "" }
-        set { UserDefaults.standard.set(newValue, forKey: "r2AccountID") }
+        UserDefaults.standard.string(forKey: "r2AccountID") ?? ""
     }
 
-    static var accessKeyID: String {
-        get { Keychain.read("accessKeyID") ?? "" }
-        set { Keychain.write("accessKeyID", newValue) }
-    }
+    static var accessKeyID: String { Keychain.read("accessKeyID") ?? "" }
 
-    static var secretAccessKey: String {
-        get { Keychain.read("secretAccessKey") ?? "" }
-        set { Keychain.write("secretAccessKey", newValue) }
-    }
+    static var secretAccessKey: String { Keychain.read("secretAccessKey") ?? "" }
 
     static var isComplete: Bool {
         !accountID.isEmpty && !accessKeyID.isEmpty && !secretAccessKey.isEmpty
+    }
+
+    /// Saves all three, trimmed. Throws when the Keychain won't take a key,
+    /// so that shows here and not as a failed upload later.
+    static func save(accountID: String, accessKeyID: String, secret: String) throws {
+        UserDefaults.standard.set(trimmed(accountID), forKey: "r2AccountID")
+        try Keychain.write("accessKeyID", trimmed(accessKeyID))
+        try Keychain.write("secretAccessKey", trimmed(secret))
+    }
+
+    /// Pasted keys often bring a space, a line break or quotes with them.
+    static func trimmed(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\"'`")))
+    }
+
+    /// What's off about a value, judged by the shape Cloudflare gives it:
+    /// the account ID and key ID are 32 hex characters, the secret 64.
+    /// A warning, not a block, in case Cloudflare changes them.
+    static func problem(_ value: String, length: Int) -> String? {
+        let value = trimmed(value)
+        guard !value.isEmpty else { return nil }
+        if value.contains(where: { !$0.isHexDigit }) { return "Cloudflare's are letters a to f and digits only." }
+        if value.count != length { return "Cloudflare's are \(length) characters; this is \(value.count)." }
+        return nil
+    }
+
+    /// The last Save and Check: when, against which bucket and keys, and
+    /// what R2 said. Kept so Settings opens knowing whether uploads work.
+    struct Check: Codable, Equatable {
+        var date: Date
+        var bucket: String
+        var accountID: String
+        var accessKeyID: String
+        /// Nil when R2 took it.
+        var error: String?
+    }
+
+    static var lastCheck: Check? {
+        get { UserDefaults.standard.data(forKey: "r2LastCheck").flatMap { try? JSONDecoder().decode(Check.self, from: $0) } }
+        set { UserDefaults.standard.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: "r2LastCheck") }
     }
 }
 
 /// The R2 keys, kept in the login keychain.
 enum Keychain {
     private static let service = "com.amongthestones.canteiro.r2"
+
+    struct Failure: LocalizedError {
+        let status: OSStatus
+        var errorDescription: String? {
+            let reason = SecCopyErrorMessageString(status, nil) as String? ?? "error \(status)"
+            return "The Keychain didn't save the key: \(reason)"
+        }
+    }
 
     static func read(_ account: String) -> String? {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
@@ -38,14 +79,24 @@ enum Keychain {
         return String(decoding: data, as: UTF8.self)
     }
 
-    static func write(_ account: String, _ value: String) {
+    /// Replaces the key, or removes it when the value is empty.
+    static func write(_ account: String, _ value: String) throws {
         let match: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
                                     kSecAttrAccount as String: account]
-        SecItemDelete(match as CFDictionary)
-        guard !value.isEmpty else { return }
-        var add = match
-        add[kSecValueData as String] = Data(value.utf8)
-        SecItemAdd(add as CFDictionary, nil)
+        if value.isEmpty {
+            let status = SecItemDelete(match as CFDictionary)
+            guard status == errSecSuccess || status == errSecItemNotFound else { throw Failure(status: status) }
+            return
+        }
+        let data = Data(value.utf8)
+        var status = SecItemUpdate(match as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if status == errSecItemNotFound {
+            var add = match
+            add[kSecValueData as String] = data
+            status = SecItemAdd(add as CFDictionary, nil)
+        }
+        guard status == errSecSuccess else { throw Failure(status: status) }
+        guard read(account) == value else { throw Failure(status: errSecDecode) }
     }
 }
 
@@ -57,7 +108,7 @@ struct R2Client: Sendable {
 
         var errorDescription: String? {
             switch self {
-            case .notSetUp: return "R2 isn't set up. Add the bucket and keys in Settings (⌘,)."
+            case .notSetUp: return "R2 isn't set up. Add the account ID and keys in Settings › Uploads (⌘,)."
             case .rejected(let code, let body): return "R2 said \(code): \(Self.message(in: body))"
             }
         }

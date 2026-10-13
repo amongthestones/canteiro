@@ -47,6 +47,7 @@ struct CanteiroApp: App {
         Settings {
             SettingsView()
                 .environment(store)
+                .environment(inbox)
         }
         .commands {
             SaveCommand()

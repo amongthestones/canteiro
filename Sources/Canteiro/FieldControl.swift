@@ -77,10 +77,7 @@ struct FieldControl: View {
         case "conditional":
             ConditionalField(spec: spec, value: $value)
         case "file", "image":
-            Text(value.string ?? "None")
-                .font(.callout.monospaced())
-                .foregroundStyle(value.isEmpty ? .tertiary : .primary)
-                .textSelection(.enabled)
+            AssetField(spec: spec, value: $value)
         default:
             Text(value.string ?? "None")
                 .foregroundStyle(.secondary)
@@ -303,6 +300,11 @@ struct ArrayField: View {
 
     var body: some View {
         let count = value.array?.count ?? 0
+        list(count)
+            .environment(\.fieldPath, nil)
+    }
+
+    private func list(_ count: Int) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             if let element = spec.element {
                 ForEach(0..<count, id: \.self) { index in
@@ -355,6 +357,7 @@ struct ConditionalField: View {
                 }
             }
         }
+        .environment(\.fieldPath, nil)
     }
 }
 

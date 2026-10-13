@@ -170,6 +170,39 @@ import Testing
         }
     }
 
+    /// A chosen image or file lands where Keystatic looks, the entry changes
+    /// by that one line, and removing it takes the line out again.
+    @Test(.enabled(if: hasSite))
+    func aChosenFileSavesWhereKeystaticReadsIt() async throws {
+        let (store, copy) = try await open()
+        defer { try? FileManager.default.removeItem(at: copy) }
+        let schema = try #require(store.schema)
+        let found = schema.items.lazy.compactMap { item -> (SchemaItem, Entry, FieldSpec)? in
+            guard let field = item.dataFields.first(where: \.isAsset) else { return nil }
+            let entry = item.kind == .singleton ? store.singletons[item.key] : store.entries[item.key]?.first
+            return entry.map { (item, $0, field) }
+        }.first
+        guard let (item, entry, field) = found else { return }
+
+        let source = copy.appending(path: "chosen.\(field.type == "image" ? "png" : "txt")")
+        try Data("not really a picture".utf8).write(to: source)
+        let place = AssetPlace(site: copy, item: item, slug: entry.slug)
+        let value = try place.store(source, field, path: [field.key])
+        var data = entry.data
+        data[field.key] = .string(value)
+        store.save(item, id: entry.id, data: data, body: entry.body)
+
+        let saved = try #require(store.current(item, id: entry.id))
+        #expect(saved.raw.contains("\(field.key): \(value)\n"))
+        #expect(FileManager.default.fileExists(atPath: try #require(place.url(for: value, field)).path))
+        let changed = Set(saved.raw.components(separatedBy: "\n")).symmetricDifference(entry.raw.components(separatedBy: "\n"))
+        #expect(changed.count <= 2, "\(changed)")
+
+        data[field.key] = nil
+        store.save(item, id: entry.id, data: data, body: entry.body)
+        #expect(store.current(item, id: entry.id)?.raw.contains("\(field.key):") == false)
+    }
+
     @Test func audioLengthReads() async throws {
         let file = FileManager.default.temporaryDirectory.appending(path: "canteiro-say-\(UUID().uuidString).m4a")
         _ = try Subprocess.run("/usr/bin/say", ["-o", file.path, "--data-format=aac", "Good morning"], timeout: 30)

@@ -20,4 +20,32 @@ import Testing
         #expect(SigV4.encode("Café à Noite.webp") == "Caf%C3%A9%20%C3%A0%20Noite.webp")
         #expect(SigV4.encode("myshow-001.mp3") == "myshow-001.mp3")
     }
+
+    @Test func pastedKeysAreTrimmed() {
+        #expect(R2Settings.trimmed("  \"abc123\"\n") == "abc123")
+    }
+
+    @Test func keysOfTheWrongShapeAreFlagged() {
+        #expect(R2Settings.problem(String(repeating: "a1", count: 16), length: 32) == nil)
+        #expect(R2Settings.problem("", length: 32) == nil, "empty is just not set")
+        #expect(R2Settings.problem(String(repeating: "a", count: 31), length: 32)?.contains("31") == true)
+        #expect(R2Settings.problem(String(repeating: "z", count: 32), length: 32)?.contains("a to f") == true)
+    }
 }
+
+@Suite struct SiteCheckTests {
+    @Test func findsGitAndSaysWhatsMissing() async {
+        let check = await SiteCheck.run(site: nil)
+        #expect(check.tools.map(\.name) == ["Node", "git", "cwebp"])
+        #expect(check.tools.first { $0.name == "git" }?.found != nil)
+        #expect(check.tools.allSatisfy { !$0.fix.isEmpty && !$0.needed.isEmpty })
+    }
+
+    @Test(.enabled(if: SiteTests.hasSite))
+    func readsTheSitesRemote() async {
+        let check = await SiteCheck.run(site: SiteTests.site)
+        #expect(check.tools.contains { $0.name == "Site packages" && $0.found != nil })
+        #expect(check.branch != nil)
+    }
+}
+

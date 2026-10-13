@@ -13,7 +13,7 @@ struct SettingsForm: View {
             if !simple.isEmpty {
                 Section {
                     ForEach(simple) { field in
-                        SettingsRow(spec: field, value: $data.child(field.key))
+                        SettingsRow(spec: field, value: $data.field(field))
                     }
                 }
             }
@@ -33,6 +33,7 @@ struct SettingsForm: View {
 /// The sections for one group: its plain fields in one section, then a
 /// section for each group inside it, titled with the path to it.
 private struct SettingsSections: View {
+    @Environment(\.fieldPath) private var path
     let spec: FieldSpec
     @Binding var value: FieldValue
     let trail: [String]
@@ -40,6 +41,13 @@ private struct SettingsSections: View {
     private var title: String { (trail + [spec.title]).joined(separator: " › ") }
 
     var body: some View {
+        // Files are named by the groups they're in; in a list they stay read-only.
+        sections
+            .environment(\.fieldPath, spec.type == "object" ? path.map { $0 + [spec.key] } : nil)
+    }
+
+    @ViewBuilder
+    private var sections: some View {
         switch spec.type {
         case "object":
             let children = spec.fields ?? []
@@ -47,7 +55,7 @@ private struct SettingsSections: View {
             if !simple.isEmpty {
                 Section {
                     ForEach(simple) { child in
-                        SettingsRow(spec: child, value: $value.child(child.key))
+                        SettingsRow(spec: child, value: $value.field(child))
                     }
                 } header: {
                     SectionHeader(title: title, description: spec.description)
@@ -156,12 +164,14 @@ private struct SettingsList: View {
 
 /// One row: the label and its help text on the left, the control on the right.
 struct SettingsRow: View {
+    @Environment(\.fieldPath) private var path
     let spec: FieldSpec
     @Binding var value: FieldValue
 
     var body: some View {
         LabeledContent {
             FieldControl(spec: spec, value: $value)
+                .environment(\.fieldPath, path.map { $0 + [spec.key] })
         } label: {
             Text(spec.title)
             if let description = spec.description {

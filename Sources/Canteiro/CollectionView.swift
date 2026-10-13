@@ -177,6 +177,7 @@ struct SingletonView: View {
 
 /// A singleton's settings. Edits save themselves (see Autosave).
 struct SingletonEditor: View {
+    @Environment(SiteStore.self) private var store
     let item: SchemaItem
     let entry: Entry
     @State private var data: FieldValue
@@ -190,6 +191,7 @@ struct SingletonEditor: View {
     var body: some View {
         SettingsForm(fields: item.dataFields, data: $data)
             .autosave(item, id: entry.id, data: data, body: nil)
+            .environment(\.assetPlace, store.siteURL.map { AssetPlace(site: $0, item: item, slug: nil) })
     }
 }
 

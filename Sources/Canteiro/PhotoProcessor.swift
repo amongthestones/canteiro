@@ -56,7 +56,7 @@ enum PhotoProcessor {
         CGImageDestinationAddImage(dest, resized, nil)
         guard CGImageDestinationFinalize(dest) else { throw Failure.unreadable }
 
-        guard let cwebp = ["/opt/homebrew/bin/cwebp", "/usr/local/bin/cwebp"].first(where: FileManager.default.isExecutableFile) else {
+        guard let cwebp = cwebpPath else {
             throw Failure.noEncoder
         }
         let out = work.appending(path: "photo.webp")
@@ -66,6 +66,11 @@ enum PhotoProcessor {
         let before = (try? source.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
         let after = (try? out.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
         return Result(file: out, width: resized.width, height: resized.height, bytesBefore: before, bytesAfter: after)
+    }
+
+    /// Homebrew's cwebp, on Apple silicon or Intel.
+    nonisolated static var cwebpPath: String? {
+        ["/opt/homebrew/bin/cwebp", "/usr/local/bin/cwebp"].first(where: FileManager.default.isExecutableFile)
     }
 
     /// The photo's name for the web in the site's photo folder:

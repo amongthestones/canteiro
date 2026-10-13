@@ -160,6 +160,10 @@ final class FieldSpec: Decodable, Sendable, Identifiable {
     let values: [FieldSpec]?
     let collection: String?
     let extensionName: String?
+    /// Where an image or file field keeps its files, and what goes before
+    /// the file name in the entry (see AssetPlace).
+    let directory: String?
+    let publicPath: String?
     let slug: SubLabel?
     /// A list's cap from the site's Astro schema (a post has one kind).
     let maxItems: Int?
@@ -178,7 +182,7 @@ final class FieldSpec: Decodable, Sendable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case key, type, label, description, multiline, options, validation, fields, element
-        case discriminant, values, collection, slug, maxItems, defaultValue
+        case discriminant, values, collection, slug, maxItems, defaultValue, directory, publicPath
         case extensionName = "extension"
     }
 
@@ -199,6 +203,8 @@ final class FieldSpec: Decodable, Sendable, Identifiable {
         values = try c.decodeIfPresent([FieldSpec].self, forKey: .values)
         collection = try c.decodeIfPresent(String.self, forKey: .collection)
         extensionName = try c.decodeIfPresent(String.self, forKey: .extensionName)
+        directory = try? c.decodeIfPresent(String.self, forKey: .directory)
+        publicPath = try? c.decodeIfPresent(String.self, forKey: .publicPath)
         slug = try? c.decodeIfPresent(SubLabel.self, forKey: .slug)
         maxItems = try c.decodeIfPresent(Int.self, forKey: .maxItems)
         defaultString = try? c.decodeIfPresent(String.self, forKey: .defaultValue)
@@ -210,4 +216,7 @@ final class FieldSpec: Decodable, Sendable, Identifiable {
     }
 
     var maxLength: Int? { validation?.length?.max }
+
+    /// An image or file field: its value names a file in the repo.
+    var isAsset: Bool { type == "image" || type == "file" }
 }

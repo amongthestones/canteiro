@@ -23,6 +23,8 @@ final class SiteStore {
     private(set) var singletons: [String: Entry] = [:]
     /// Files that didn't parse. Shown, not hidden: a broken file is worth knowing about.
     private(set) var problems: [String] = []
+    /// Why canteiro.json didn't load, for Settings. Also in `problems`.
+    private(set) var configProblem: String?
 
     /// Entries whose file changed on disk since they were read. A save
     /// stops and asks rather than write over the other change.
@@ -93,8 +95,10 @@ final class SiteStore {
             problems = loaded.problems
             do {
                 config = try SiteConfig.load(site: url)
+                configProblem = nil
             } catch {
                 config = SiteConfig()
+                configProblem = error.localizedDescription
                 problems.insert(error.localizedDescription, at: 0)
             }
             refreshChanges()
@@ -242,6 +246,13 @@ final class SiteStore {
         var trashed: [URL] = []
         for entry in list where ids.contains(entry.id) {
             do {
+                // Its images and files go too, as in Keystatic.
+                if let siteURL {
+                    let place = AssetPlace(site: siteURL, item: item, slug: entry.slug)
+                    for (file, field) in place.files(item.dataFields, in: entry.data) {
+                        if let moved = try place.trash(file, field) { trashed.append(moved) }
+                    }
+                }
                 var moved: NSURL?
                 try FileManager.default.trashItem(at: entry.url, resultingItemURL: &moved)
                 if let moved { trashed.append(moved as URL) }
