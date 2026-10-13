@@ -78,6 +78,8 @@ struct BodyTextView: NSViewRepresentable {
             MarkdownStyler.style(storage, mode: parent.mode)
             view.typingAttributes = MarkdownStyler.baseAttributes(parent.mode)
             measured = nil
+            // A grid moves with its table, and TextKit only redraws the text.
+            if parent.mode == .rich, storage.string.contains("|") { view.needsDisplay = true }
         }
 
         func height(of storage: NSTextStorage, width: CGFloat) -> CGFloat {
@@ -145,9 +147,49 @@ struct BodyTextView: NSViewRepresentable {
 }
 
 /// An NSTextView that hands dropped photos to the app instead of inserting
-/// their file paths.
+/// their file paths, and draws the grid of Rich tables.
 final class BodyNSTextView: NSTextView {
     var onImageFiles: (([URL], Int) -> Bool)?
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        drawTableGrids(in: dirtyRect)
+    }
+
+    /// Hairlines around and between the cells of each row MarkdownStyler
+    /// tagged, a darker one under the header.
+    private func drawTableGrids(in dirtyRect: NSRect) {
+        guard let storage = textStorage, let layout = textLayoutManager,
+              let content = layout.textContentManager, let container = textContainer else { return }
+        let hairline = 1 / (window?.backingScaleFactor ?? 2)
+        let origin = textContainerOrigin
+        storage.enumerateAttribute(.tableGrid, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
+            guard let grid = value as? TableGrid,
+                  let start = content.location(content.documentRange.location, offsetBy: range.location),
+                  let end = content.location(start, offsetBy: range.length) else { return }
+            // The row's frame, with the divider folded into the header's.
+            var frame = NSRect.null
+            layout.enumerateTextLayoutFragments(from: start) { fragment in
+                guard fragment.rangeInElement.location.compare(end) == .orderedAscending else { return false }
+                frame = frame.union(fragment.layoutFragmentFrame)
+                return true
+            }
+            guard !frame.isNull else { return }
+            frame = frame.offsetBy(dx: origin.x, dy: origin.y)
+            guard frame.intersects(dirtyRect.insetBy(dx: -2, dy: -2)) else { return }
+            let left = origin.x, right = origin.x + min(grid.right, container.size.width)
+
+            NSColor.separatorColor.setFill()
+            for x in [0] + grid.lines + [right - left] {
+                NSRect(x: left + x - hairline / 2, y: frame.minY, width: hairline, height: frame.height).fill()
+            }
+            if grid.header {
+                NSRect(x: left, y: frame.minY, width: right - left, height: hairline).fill()
+                NSColor.tertiaryLabelColor.setFill()
+            }
+            NSRect(x: left, y: frame.maxY - hairline, width: right - left, height: hairline).fill()
+        }
+    }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self],

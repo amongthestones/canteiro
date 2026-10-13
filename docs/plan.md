@@ -95,7 +95,7 @@ Site syntax it must understand, from the site's remark/rehype plugins:
 | `[caption]…[/caption]` (old WordPress) | as typed | image with caption |
 | `{{TOC}}` | as typed | a "Contents" placeholder chip |
 | `## Transcript` (or Transcrición, Transcripción) | as typed | transcript section set apart |
-| Tables | as typed, columns lined up | a table |
+| Tables | as typed, pipes and `\|---\|` faded | columns lined up, `:---:` alignment, grid lines |
 
 How: TextKit 2 with styling from a markdown parse (Apple's swift-markdown,
 which is cmark-gfm) plus small passes for the site-only syntax above. Those

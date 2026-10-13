@@ -113,7 +113,178 @@ enum MarkdownStyler {
         each(#"\{\{TOC\}\}"#) { m in
             storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: m.range)
         }
+        // Tables last, so cells are measured with their links and bold done.
+        for table in tables(in: text) {
+            styleTable(table, in: storage, mode: mode, mark: mark, trait: trait)
+        }
         storage.endEditing()
+    }
+
+    /// A pipe table: its rows' cells (the text inside, trimmed) and the
+    /// |---| line under the header.
+    struct Table {
+        var rows: [(line: NSRange, cells: [NSRange])]
+        var divider: NSRange
+    }
+
+    static func tables(in text: NSString) -> [Table] {
+        var lines: [NSRange] = []
+        var at = 0
+        while at < text.length {
+            let line = text.lineRange(for: NSRange(location: at, length: 0))
+            lines.append(line)
+            at = NSMaxRange(line)
+        }
+        func content(_ line: NSRange) -> String {
+            text.substring(with: line).trimmingCharacters(in: .newlines)
+        }
+        func isRow(_ line: NSRange) -> Bool {
+            let s = content(line)
+            return s.contains("|") && !s.trimmingCharacters(in: .whitespaces).isEmpty
+        }
+        let divider = try! NSRegularExpression(pattern: #"^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$"#)
+        func isDivider(_ line: NSRange) -> Bool {
+            let s = content(line)
+            return s.contains("|") && divider.firstMatch(in: s, range: NSRange(location: 0, length: (s as NSString).length)) != nil
+        }
+
+        var tables: [Table] = []
+        var i = 0
+        while i + 1 < lines.count {
+            guard isRow(lines[i]), !isDivider(lines[i]), isDivider(lines[i + 1]) else { i += 1; continue }
+            var rows = [(lines[i], cells(in: lines[i], of: text))]
+            var j = i + 2
+            while j < lines.count, isRow(lines[j]) {
+                rows.append((lines[j], cells(in: lines[j], of: text)))
+                j += 1
+            }
+            tables.append(Table(rows: rows, divider: lines[i + 1]))
+            i = j
+        }
+        return tables
+    }
+
+    /// The cells of one row, split on pipes that aren't escaped. An empty
+    /// cell is an empty range where its text would go.
+    static func cells(in line: NSRange, of text: NSString) -> [NSRange] {
+        var end = NSMaxRange(line)
+        while end > line.location, [10, 13].contains(text.character(at: end - 1)) { end -= 1 }
+        var pipes: [Int] = []
+        for k in line.location..<end where text.character(at: k) == 124 && (k == line.location || text.character(at: k - 1) != 92) {
+            pipes.append(k)
+        }
+        func blank(_ k: Int) -> Bool { [32, 9].contains(text.character(at: k)) }
+        var bounds = [line.location - 1] + pipes + [end]
+        // A leading or trailing pipe doesn't open a cell.
+        if let first = pipes.first, (line.location..<first).allSatisfy(blank) { bounds.removeFirst() }
+        if let last = pipes.last, last + 1 <= end, (last + 1..<end).allSatisfy(blank), bounds.count > 2 { bounds.removeLast() }
+        var cells: [NSRange] = []
+        for (a, b) in zip(bounds, bounds.dropFirst()) {
+            var start = a + 1, stop = b
+            while start < stop, blank(start) { start += 1 }
+            while stop > start, blank(stop - 1) { stop -= 1 }
+            cells.append(NSRange(location: start, length: stop - start))
+        }
+        return cells
+    }
+
+    /// How a column's cells sit, from the colons in the |---| line.
+    enum Alignment { case left, center, right }
+
+    static func alignments(_ table: Table, in text: NSString) -> [Alignment] {
+        cells(in: table.divider, of: text).map { cell in
+            let s = text.substring(with: cell)
+            switch (s.hasPrefix(":"), s.hasSuffix(":")) {
+            case (true, true): return .center
+            case (false, true): return .right
+            default: return .left
+            }
+        }
+    }
+
+    /// Markdown fades the pipes and the |---| line. Rich hides them, bolds
+    /// the header and lays the cells out in columns: the hidden pipe before
+    /// each cell is kerned out to where the cell starts, and a wrapped last
+    /// cell hangs under its own column. Each row is tagged with the grid's
+    /// geometry for BodyNSTextView to draw. The text itself is never touched.
+    private static func styleTable(_ table: Table, in storage: NSTextStorage, mode: BodyMode,
+                                   mark: (NSRange) -> Void, trait: (NSRange, NSFontTraitMask) -> Void) {
+        func gaps(_ row: (line: NSRange, cells: [NSRange])) -> [NSRange] {
+            var gaps: [NSRange] = []
+            var from = row.line.location
+            for cell in row.cells + [NSRange(location: NSMaxRange(row.line), length: 0)] {
+                gaps.append(NSRange(location: from, length: cell.location - from))
+                from = NSMaxRange(cell)
+            }
+            return gaps
+        }
+        guard mode == .rich else {
+            for row in table.rows { gaps(row).forEach { storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: $0) } }
+            storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: table.divider)
+            return
+        }
+
+        table.rows[0].cells.forEach { trait($0, .boldFontMask) }
+        for row in table.rows { gaps(row).forEach(mark) }
+        mark(table.divider)
+        let flat = NSMutableParagraphStyle()
+        flat.maximumLineHeight = 1
+        storage.addAttribute(.paragraphStyle, value: flat, range: table.divider)
+
+        func width(_ range: NSRange) -> CGFloat {
+            range.length == 0 ? 0 : storage.attributedSubstring(from: range).size().width
+        }
+        // Each column as wide as its widest cell. All but the last stop at a
+        // point, so one long cell can't push the rest off the page; the last
+        // wraps instead.
+        let pad: CGFloat = 10
+        let columns = table.rows.map(\.cells.count).max() ?? 0
+        var widths = [CGFloat](repeating: 0, count: columns)
+        for row in table.rows {
+            for (c, cell) in row.cells.enumerated() {
+                widths[c] = max(widths[c], c == columns - 1 ? width(cell) : min(width(cell), 260))
+            }
+        }
+        var x: [CGFloat] = [pad]
+        for w in widths.dropLast() { x.append(x.last! + w + 2 * pad) }
+        let align = alignments(table, in: storage.string as NSString)
+
+        let base = baseAttributes(.rich)[.paragraphStyle] as! NSParagraphStyle
+        let lines = x.dropFirst().map { $0 - pad }
+        let right = x.last! + widths.last! + pad
+        for (r, row) in table.rows.enumerated() {
+            let style = base.mutableCopy() as! NSMutableParagraphStyle
+            style.headIndent = x.last!
+            style.tailIndent = -pad
+            style.paragraphSpacingBefore = 0
+            style.paragraphSpacing = 2
+            // Where the line has got to, so the next hidden pipe knows how
+            // far to kern.
+            var reached: CGFloat = 0
+            for (c, cell) in row.cells.enumerated() {
+                let gapStart = c == 0 ? row.line.location : NSMaxRange(row.cells[c - 1])
+                let gap = NSRange(location: gapStart, length: cell.location - gapStart)
+                let slack = max(widths[c] - width(cell), 0)
+                let shift = c < align.count ? [.left: 0, .center: slack / 2, .right: slack][align[c]]! : 0
+                reached += width(gap)
+                if gap.length > 0 {
+                    let kern = max(x[c] + shift - reached, c == 0 ? 0 : pad)
+                    storage.addAttribute(.kern, value: kern, range: NSRange(location: cell.location - 1, length: 1))
+                    reached += kern
+                } else {
+                    style.firstLineHeadIndent = pad
+                    reached = pad
+                }
+                reached += width(cell)
+            }
+            storage.addAttribute(.paragraphStyle, value: style, range: row.line)
+            let grid = TableGrid(lines: lines, right: right, header: r == 0)
+            storage.addAttribute(.tableGrid, value: grid, range: row.line)
+        }
+        // The divider belongs to the header's cell, so the grid has no gap.
+        if let header = storage.attribute(.tableGrid, at: table.rows[0].line.location, effectiveRange: nil) {
+            storage.addAttribute(.tableGrid, value: header, range: table.divider)
+        }
     }
 
     static func baseFont(_ mode: BodyMode) -> NSFont {
@@ -126,4 +297,22 @@ enum MarkdownStyler {
         paragraph.paragraphSpacing = mode == .rich ? 6 : 0
         return [.font: baseFont(mode), .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph]
     }
+}
+
+/// A table row's grid, in text container points: the column lines between
+/// cells and the right edge. The left edge is 0.
+final class TableGrid: NSObject {
+    let lines: [CGFloat]
+    let right: CGFloat
+    let header: Bool
+
+    init(lines: [CGFloat], right: CGFloat, header: Bool) {
+        self.lines = lines
+        self.right = right
+        self.header = header
+    }
+}
+
+extension NSAttributedString.Key {
+    static let tableGrid = NSAttributedString.Key("canteiroTableGrid")
 }
