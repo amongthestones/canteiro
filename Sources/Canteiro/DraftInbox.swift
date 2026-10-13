@@ -12,9 +12,9 @@ struct InboxDraft: Identifiable, Hashable {
     let preview: String
 }
 
-/// A writing app's folder, from the site's canteiro.json: iA Writer's Blog
-/// folder in iCloud, for Among the Stones. Drafts are written there, on the
-/// phone or the Mac, and imported as entries. An imported file moves to
+/// A writing app's folder, from the site's canteiro.json, such as a folder in
+/// iA Writer's iCloud library. Drafts are written there, on the phone or the
+/// Mac, and imported as entries. An imported file moves to
 /// Imported/, so a piece only ever lives in one place: the writing app until
 /// it's imported, the site after.
 @MainActor @Observable
@@ -29,7 +29,7 @@ final class DraftInbox {
     /// Edits not yet written, by file.
     private var unsaved: [URL: String] = [:]
     /// Each open file as last read or written. A save checks the file still
-    /// says this, so an edit from iA Writer is never written over.
+    /// says this, so an edit from the writing app is never written over.
     private var known: [URL: String] = [:]
     private(set) var conflicts: Set<URL> = []
     private(set) var saveErrors: [URL: String] = [:]
@@ -157,7 +157,7 @@ final class DraftInbox {
 
     func hasUnsaved(_ url: URL) -> Bool { unsaved[url] != nil }
 
-    /// Writes the edits, unless iA Writer (or iCloud) changed the file since.
+    /// Writes the edits, unless the writing app (or iCloud) changed the file since.
     func save(_ url: URL, overwrite: Bool = false) {
         guard let text = unsaved[url] else { return }
         let onDisk = try? String(contentsOf: url, encoding: .utf8)

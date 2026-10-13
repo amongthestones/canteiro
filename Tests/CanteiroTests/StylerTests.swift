@@ -44,14 +44,14 @@ import Testing
         #expect((at(s, "Better")[.font] as? NSFont)?.isFixedPitch == true)
     }
 
-    private let table = "Intro.\n\n| Account | Handle |\n|---|---|\n| Instagram | [@amongthestones](https://instagram.com/amongthestones) |\n| LinkedIn | [jmbaum](https://www.linkedin.com/in/jmbaum/) |\n\n*Checked.*\n"
+    private let table = "Intro.\n\n| Account | Handle |\n|---|---|\n| Instagram | [@example](https://instagram.com/example) |\n| LinkedIn | [sample](https://www.linkedin.com/in/sample/) |\n\n*Checked.*\n"
 
     @Test func findsTheTableAndItsCells() {
         let tables = MarkdownStyler.tables(in: table as NSString)
         #expect(tables.count == 1)
         #expect(tables[0].rows.count == 3)
         let cells = tables[0].rows[1].cells.map { (table as NSString).substring(with: $0) }
-        #expect(cells == ["Instagram", "[@amongthestones](https://instagram.com/amongthestones)"])
+        #expect(cells == ["Instagram", "[@example](https://instagram.com/example)"])
         let escaped = "a | \\| b" as NSString
         #expect(MarkdownStyler.cells(in: NSRange(location: 0, length: escaped.length), of: escaped).count == 2,
                 "an escaped pipe stays in its cell")
@@ -72,8 +72,8 @@ import Testing
             return s.attributedSubstring(from: NSRange(location: line.location, length: cellAt - line.location)).size().width
         }
         let header = start("| Account", "Handle")
-        #expect(abs(start("| Instagram", "[@among") - header) < 0.5)
-        #expect(abs(start("| LinkedIn", "[jmbaum") - header) < 0.5)
+        #expect(abs(start("| Instagram", "[@exam") - header) < 0.5)
+        #expect(abs(start("| LinkedIn", "[sample") - header) < 0.5)
     }
 
     @Test func markdownFadesTheTablePipes() {

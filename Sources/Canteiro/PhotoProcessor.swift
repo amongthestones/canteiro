@@ -69,7 +69,7 @@ enum PhotoProcessor {
     }
 
     /// The photo's name for the web in the site's photo folder:
-    /// uploads/2026/10/cemiterio-a-eirexe.webp.
+    /// uploads/2026/10/cafe-a-noite.webp.
     static func key(for source: URL, in folder: String) -> String {
         folder + Slug.make(source.deletingPathExtension().lastPathComponent) + ".webp"
     }
@@ -80,7 +80,7 @@ enum Slug {
     static func make(_ text: String) -> String {
         // Latin-ASCII spells out what stripping accents can't: ø as o, ß as ss.
         let ascii = text.applyingTransform(StringTransform("Any-Latin; Latin-ASCII"), reverse: false) ?? text
-        // "Jimmy's" is jimmys, as Keystatic makes it, not jimmy-s.
+        // "Anna's" is annas, as Keystatic makes it, not anna-s.
         let words = ascii.lowercased().replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "\u{2019}", with: "").split { !$0.isLetter && !$0.isNumber }
         let slug = words.joined(separator: "-").filter { $0.isASCII }
         return slug.isEmpty ? "file" : slug

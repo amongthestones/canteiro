@@ -50,14 +50,11 @@ final class SiteStore {
 
     var siteName: String { siteURL?.lastPathComponent ?? "Canteiro" }
 
-    /// Reopen the last site, or the usual one on this Mac.
+    /// Reopen the last site, if it's still there.
     func restore() async {
-        let saved = UserDefaults.standard.string(forKey: Self.siteKey)
-        let fallback = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Projects/among-the-stones").path
-        for path in [saved, fallback].compactMap({ $0 }) where Self.isSite(URL(fileURLWithPath: path)) {
-            await open(URL(fileURLWithPath: path))
-            return
-        }
+        guard let saved = UserDefaults.standard.string(forKey: Self.siteKey),
+              Self.isSite(URL(fileURLWithPath: saved)) else { return }
+        await open(URL(fileURLWithPath: saved))
     }
 
     func chooseSite() {

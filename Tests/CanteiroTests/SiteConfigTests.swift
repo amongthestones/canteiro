@@ -25,7 +25,7 @@ import Testing
         #expect(config == SiteConfig())
         #expect(config.inboxFolder == nil)
         #expect(config.publicURL(for: "x.webp") == nil)
-        #expect(!config.isEpisodes("episodes-corrixeme"))
+        #expect(!config.isEpisodes("episodes-myshow"))
         #expect(config.extras.isEmpty)
     }
 
@@ -33,10 +33,10 @@ import Testing
         let config = try SiteConfig.load(site: site(json))
         #expect(config.inboxFolder?.path == NSString(string: "~/Drafts/Blog").expandingTildeInPath)
         #expect(config.inbox?.app == "iA Writer")
-        #expect(config.isEpisodes("episodes-corrixeme"))
+        #expect(config.isEpisodes("episodes-myshow"))
         #expect(!config.isEpisodes("posts"))
-        #expect(config.guid(show: "corrixeme", number: 4) == "corrixeme-ep4")
-        #expect(config.audioFolder(show: "corrixeme") == "audio/corrixeme/")
+        #expect(config.guid(show: "myshow", number: 4) == "myshow-ep4")
+        #expect(config.audioFolder(show: "myshow") == "audio/myshow/")
         #expect(config.photoFolder(date: Date(timeIntervalSince1970: 1_791_000_000)) == "img/2026/")
         #expect(config.publicURL(for: "img/2026/x.webp") == "https://media.example.com/img/2026/x.webp")
         #expect(config.extras == [.highlight, .toc])

@@ -186,7 +186,7 @@ struct PublishSheet: View {
         }
     }
 
-    /// "Edit Moon Road", "Add The Count", "Edit Vibe Check, Tags and 2 more".
+    /// "Edit Morning Walk", "Add Field Notes", "Edit About, Tags and 2 more".
     private func suggestedMessage() -> String {
         let chosen = changes.filter { picked.contains($0.id) }
         guard !chosen.isEmpty else { return "" }

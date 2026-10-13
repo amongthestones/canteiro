@@ -2,7 +2,7 @@
 
 A native Mac editor for an Astro site that uses [Keystatic](https://keystatic.com). It edits the site's markdown, YAML and JSON files in place, makes its forms from the site's own `keystatic.config.ts`, uploads photos and podcast audio to Cloudflare R2, and publishes by committing and pushing with git.
 
-It was made for one site, [Among the Stones](https://amongthestones.com), and is in daily use there. Nothing about that site is written into the app: what Canteiro can't learn from the Keystatic config comes from a small `canteiro.json` in the site's repo. Any Keystatic site should open; how well it fits yours depends on how closely your setup matches the requirements below.
+It started as the editor for one site and is in daily use there, but nothing about any site is written into the app. What Canteiro can't learn from the Keystatic config comes from a small `canteiro.json` in the site's repo. Any Keystatic site should open; how well it fits yours depends on how closely your setup matches the requirements below.
 
 - [What it does](#what-it-does)
 - [What it needs](#what-it-needs)
@@ -179,7 +179,7 @@ Preview (⌥⌘P) opens a window with the selected entry as your site renders it
 
 ## Publish
 
-Publish opens a sheet with every changed file and its diff, colored. Untick any you don't want in this commit. Canteiro suggests a message from the titles of what changed ("Edit Moon Road and Tags", "Add Leiras in October"), which you can rewrite.
+Publish opens a sheet with every changed file and its diff, colored. Untick any you don't want in this commit. Canteiro suggests a message from the titles of what changed ("Edit Morning Walk and Tags", "Add Field Notes"), which you can rewrite.
 
 It commits exactly the files you picked, nothing else that's staged, and pushes to your current branch with the system `git`. If the push is turned down because the remote has newer commits, it offers to pull them first (a rebase that sets any other work in progress aside while it runs) and push again.
 
@@ -319,7 +319,11 @@ swift test
 swift run
 ```
 
-Some tests read and edit a copy of a real Keystatic site (Among the Stones, at `~/Projects/among-the-stones`) and are skipped when it isn't there. Every other test stands alone.
+Most tests stand alone. Some open a real Keystatic site, edit a scratch copy of it and check the results: they run when `CANTEIRO_TEST_SITE` points to one, and are skipped otherwise. They find what they need by shape (a collection with drafts, the asides stream, podcast collections from `canteiro.json`), so any site works, and the site itself is never touched.
+
+```sh
+CANTEIRO_TEST_SITE=~/Sites/my-site swift test
+```
 
 | File | What it does |
 |---|---|
@@ -340,8 +344,6 @@ Some tests read and edit a copy of a real Keystatic site (Among the Stones, at `
 | `Git.swift`, `PublishSheet.swift` | Changes, diffs, commit and push |
 | `ListFilter.swift`, `NewEntry.swift` | The list filter and new entries |
 | `Subprocess.swift` | Running Node, git and `cwebp` |
-
-[docs/plan.md](docs/plan.md) is the original design document, written before the app existed. Some of it has changed since, as noted there.
 
 ## License
 

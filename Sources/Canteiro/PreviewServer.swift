@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 /// The site's `astro dev` server, which renders drafts with a Draft banner.
-/// Uses one that's already running for this site (Faro's, a terminal's), or
+/// Uses one that's already running for this site (a terminal's, another tool's), or
 /// starts its own and stops it when Canteiro quits.
 @MainActor
 @Observable
@@ -88,7 +88,7 @@ final class PreviewServer {
     }
 }
 
-/// Finds listening ports with lsof, the way Faro does.
+/// Finds listening ports with lsof.
 enum DevServerScan {
     static let ports = 4321...4340
 

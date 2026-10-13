@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// The drafts waiting in the inbox folder (iA Writer's Blog, for Among the
-/// Stones): the list on the left, the selected one on the right, as a
+/// The drafts waiting in the inbox folder: the list on the left, the selected one on the right, as a
 /// collection is shown. Edits save to the draft's file; Import makes it an
 /// entry.
 struct InboxView: View {

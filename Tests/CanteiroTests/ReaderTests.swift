@@ -23,7 +23,7 @@ import Testing
         part: 2
         date: 2026-09-28T23:10:00.000Z
         quoted: "2020-04-21T18:24:40"
-        tags: ["life", "Galicia"]
+        tags: ["life", "Travel"]
         empty:
         """)
         guard case .object(let pairs) = value else { Issue.record("not an object"); return }
@@ -33,12 +33,12 @@ import Testing
         #expect(value["part"] == .int(2))
         if case .date(_, let raw) = value["date"] { #expect(raw == "2026-09-28T23:10:00.000Z") } else { Issue.record("date") }
         #expect(value["quoted"]?.date != nil)
-        #expect(value["tags"] == .array([.string("life"), .string("Galicia")]))
+        #expect(value["tags"] == .array([.string("life"), .string("Travel")]))
         #expect(value["empty"] == .null)
     }
 
     @Test func jsonReadsAsYAML() throws {
-        let value = try YAMLReader.parse(#"{"tags": ["A Coruña", "ADHD"], "explicit": false}"#)
+        let value = try YAMLReader.parse(#"{"tags": ["São Paulo", "Health"], "explicit": false}"#)
         #expect(value["tags"]?.array?.count == 2)
         #expect(value["explicit"] == .bool(false))
     }

@@ -2,29 +2,37 @@ import Foundation
 import Testing
 @testable import Canteiro
 
-/// Reads the real Among the Stones site, when it's on this Mac.
+/// Reads a real Keystatic site: the one CANTEIRO_TEST_SITE points to.
+/// Skipped when it isn't set.
 @Suite struct SiteTests {
-    static let site = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Projects/among-the-stones")
+    static let site: URL = {
+        let path = ProcessInfo.processInfo.environment["CANTEIRO_TEST_SITE"] ?? ""
+        return URL(fileURLWithPath: NSString(string: path).expandingTildeInPath)
+    }()
 
-    @Test(.enabled(if: SiteStore.isSite(site)))
+    static var hasSite: Bool {
+        ProcessInfo.processInfo.environment["CANTEIRO_TEST_SITE"] != nil && SiteStore.isSite(site)
+    }
+
+    @Test(.enabled(if: hasSite))
     func readsEveryFile() async throws {
         let schema = try await SchemaLoader.load(site: Self.site)
-        #expect(schema.groups.map(\.name) == ["Writing", "Podcasts", "Tales", "Site"])
+        #expect(!schema.items.isEmpty)
+        #expect(schema.groups.flatMap(\.items).count == schema.items.count, "every item is in the sidebar once")
         let loaded = SiteStore.readAll(schema, site: Self.site)
         #expect(loaded.problems.isEmpty, "\(loaded.problems)")
-        #expect((loaded.entries["posts"]?.count ?? 0) > 200)
-        #expect(loaded.entries["fiction"]?.first { $0.slug == "the-dry-ford" }?.data["work"] == .string("moon-road"))
-        #expect(loaded.singletons["talesSettings"]?.data["glossary"]?["terms"]?.array?.isEmpty == false)
-        #expect(loaded.singletons["tags"]?.data["tags"]?.array?.isEmpty == false)
-        // Every post with a date has one that parses.
-        let undated = loaded.entries["posts"]?.filter { $0.data["date"] != nil && $0.data["date"]?.date == nil } ?? []
-        #expect(undated.isEmpty, "\(undated.map(\.id))")
+        // Every entry with a date has one that parses.
+        for item in schema.items where item.kind == .collection {
+            guard let field = item.dateField else { continue }
+            let undated = loaded.entries[item.key]?.filter { $0.data[field.key] != nil && $0.data[field.key]?.date == nil } ?? []
+            #expect(undated.isEmpty, "\(undated.map(\.id))")
+        }
     }
 
     /// Every file on the site: splicing unchanged data rebuilds it byte for
     /// byte, a fresh rewrite of every field reads back the same, and JSON
     /// matches Keystatic's own output.
-    @Test(.enabled(if: SiteStore.isSite(site)))
+    @Test(.enabled(if: hasSite))
     func everyFileRoundTrips() async throws {
         let schema = try await SchemaLoader.load(site: Self.site)
         let loaded = SiteStore.readAll(schema, site: Self.site)
@@ -46,13 +54,12 @@ import Testing
                 #expect(Self.same(reread, entry.data), "\(entry.id) rewrite:\n\(fresh)")
             }
         }
-        #expect(checked > 280)
+        #expect(checked > 0)
     }
 
-    /// The editor hides a blank line at the top of a body; putting it back
-    /// gives every body on the site back exactly. The site dropped those lines
-    /// on 2026-10-04, so few or none are left to hide.
-    @Test(.enabled(if: SiteStore.isSite(site)))
+    /// The editor hides blank lines at the top of a body; putting them back
+    /// gives every body on the site back exactly.
+    @Test(.enabled(if: hasSite))
     func hiddenLeadingLinesComeBack() async throws {
         let schema = try await SchemaLoader.load(site: Self.site)
         let loaded = SiteStore.readAll(schema, site: Self.site)

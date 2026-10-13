@@ -85,7 +85,7 @@ for (const [name, collection] of Object.entries(astroCollections)) {
   }
 }
 
-// A Keystatic path (src/content/episodes/corrixeme/*) names its Astro
+// A Keystatic path (src/content/episodes/myshow/*) names its Astro
 // collection by the folder after src/content/.
 const astroName = (path) => path.match(/^src\/content\/([^/*]+)/)?.[1];
 

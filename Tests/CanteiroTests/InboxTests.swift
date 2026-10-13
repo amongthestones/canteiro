@@ -4,8 +4,8 @@ import Testing
 
 @Suite struct InboxTests {
     @Test func titleFromTheFirstHeading() {
-        let parsed = DraftInbox.parse("# Walking to Chantada\n\nThe road was quiet.\n", name: "Untitled")
-        #expect(parsed.title == "Walking to Chantada")
+        let parsed = DraftInbox.parse("# Walking to the river\n\nThe road was quiet.\n", name: "Untitled")
+        #expect(parsed.title == "Walking to the river")
         #expect(parsed.body == "The road was quiet.\n", "the heading leaves the body; the post shows its title")
         #expect(parsed.fields.isEmpty)
     }
@@ -17,7 +17,7 @@ import Testing
     }
 
     @Test func frontmatterComesAlong() {
-        let parsed = DraftInbox.parse("---\ntitle: From YAML\ntags:\n  - galicia\n---\n# A heading\n\nBody.\n", name: "x")
+        let parsed = DraftInbox.parse("---\ntitle: From YAML\ntags:\n  - travel\n---\n# A heading\n\nBody.\n", name: "x")
         #expect(parsed.title == "From YAML", "frontmatter's title wins over the heading")
         #expect(parsed.fields.map(\.key) == ["tags"])
         #expect(parsed.body == "Body.\n")

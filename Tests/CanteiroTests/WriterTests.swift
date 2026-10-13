@@ -36,17 +36,17 @@ import Testing
         let raw = "title: Glossary\n"
         let e = try entry(raw, body: false)
         var data = e.data
-        data["terms"] = .array([.object([FieldPair(key: "term", value: .string("Duna")),
-                                         FieldPair(key: "meaning", value: .string("Life-force: it pools."))])])
-        data["tags"] = .array([.string("A Coruña"), .string("true")])
+        data["terms"] = .array([.object([FieldPair(key: "term", value: .string("Tide")),
+                                         FieldPair(key: "meaning", value: .string("Water: it pools."))])])
+        data["tags"] = .array([.string("São Paulo"), .string("true")])
         let out = FileWriter.text(for: e, data: data, body: nil, format: Format(data: "yaml"))
         #expect(out == """
         title: Glossary
         terms:
-          - term: Duna
-            meaning: "Life-force: it pools."
+          - term: Tide
+            meaning: "Water: it pools."
         tags:
-          - A Coruña
+          - São Paulo
           - "true"
 
         """)
@@ -65,7 +65,7 @@ import Testing
         for s in ["", " pad", "true", "No", "null", "12", "3.5", "2026-09-28", "- dash", "a: b", "#hash", "x #y", "'q"] {
             #expect(YAMLEmitter.needsQuotes(s), "\(s)")
         }
-        for s in ["2026-10-04-1032", "Moon Road", "Ash Season", "The Stranger's Gun", "A Coruña", "/tales/", "http://x.y/z"] {
+        for s in ["2026-10-04-1032", "Morning Road", "Dry Season", "The Baker's Dozen", "São Paulo", "/notes/", "http://x.y/z"] {
             #expect(!YAMLEmitter.needsQuotes(s), "\(s)")
         }
     }

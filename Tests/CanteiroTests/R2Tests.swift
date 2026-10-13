@@ -17,7 +17,7 @@ import Testing
     }
 
     @Test func pathSegmentsAreEncoded() {
-        #expect(SigV4.encode("Cemitério à Eirexe.webp") == "Cemit%C3%A9rio%20%C3%A0%20Eirexe.webp")
-        #expect(SigV4.encode("corrixeme-001.mp3") == "corrixeme-001.mp3")
+        #expect(SigV4.encode("Café à Noite.webp") == "Caf%C3%A9%20%C3%A0%20Noite.webp")
+        #expect(SigV4.encode("myshow-001.mp3") == "myshow-001.mp3")
     }
 }
