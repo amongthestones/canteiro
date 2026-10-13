@@ -342,3 +342,7 @@ Some tests read and edit a copy of a real Keystatic site (Among the Stones, at `
 | `Subprocess.swift` | Running Node, git and `cwebp` |
 
 [docs/plan.md](docs/plan.md) is the original design document, written before the app existed. Some of it has changed since, as noted there.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
