@@ -56,7 +56,8 @@ struct Autosave: ViewModifier {
     }
 }
 
-private struct Bar<Actions: View>: View {
+/// A strip across the top of an editor: a problem and what to do about it.
+struct Bar<Actions: View>: View {
     let systemImage: String
     let tint: Color
     let text: String

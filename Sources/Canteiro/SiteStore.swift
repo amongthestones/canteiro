@@ -299,12 +299,12 @@ final class SiteStore {
     /// A new entry named by its title: the file is the title as a slug,
     /// the config's defaults are filled in, and it starts as a draft, so a
     /// publish can't put it on the site half-written.
-    func createEntry(_ item: SchemaItem, title: String) throws {
+    func createEntry(_ item: SchemaItem, title: String, body: String = "", values: [String: FieldValue] = [:]) throws {
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        var values: [String: FieldValue] = [:]
+        var values = values
         if let slugField = item.slugField { values[slugField] = .string(title) }
         if item.dataFields.contains(where: { $0.key == "draft" && $0.type == "checkbox" }) { values["draft"] = .bool(true) }
-        try create(item, slug: Slug.make(title), data: newData(item, values), body: item.bodyField == nil ? nil : "")
+        try create(item, slug: Slug.make(title), data: newData(item, values), body: item.bodyField == nil ? nil : body)
     }
 
     /// The first dated stream of short text: the asides.

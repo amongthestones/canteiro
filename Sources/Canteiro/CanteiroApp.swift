@@ -6,12 +6,14 @@ struct CanteiroApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var store = SiteStore()
     @State private var preview = PreviewServer()
+    @State private var inbox = DraftInbox()
 
     var body: some Scene {
         Window("Canteiro", id: "main") {
             ContentView()
                 .environment(store)
                 .environment(preview)
+                .environment(inbox)
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
                     preview.stop()
                 }

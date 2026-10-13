@@ -77,8 +77,10 @@ struct EntryEditor: View {
 }
 
 extension EntryEditor {
+    private var uploadPhoto: @MainActor (URL) async throws -> String { Self.photoUploader(store) }
+
     /// A dropped photo: resized, WebP, no location, onto R2, as markdown.
-    private var uploadPhoto: @MainActor (URL) async throws -> String {
+    static func photoUploader(_ store: SiteStore) -> @MainActor (URL) async throws -> String {
         { [store] file in
             let result = try await Task.detached { try PhotoProcessor.process(file) }.value
             let url = try await store.upload(result.file, key: PhotoProcessor.key(for: file), contentType: "image/webp",

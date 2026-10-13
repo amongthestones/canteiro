@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(SiteStore.self) private var store
+    @Environment(DraftInbox.self) private var inbox
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var showPublish = false
@@ -62,6 +63,7 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Catch commits and edits made outside the app.
             store.refreshChanges()
+            inbox.refresh()
         }
     }
 
@@ -89,7 +91,9 @@ struct ContentView: View {
                 Button("Try Again") { store.reload() }
             }
         case .ready:
-            if let key = store.selectedItem, let item = store.schema?.item(key) {
+            if store.selectedItem == DraftInbox.sidebarKey {
+                InboxView()
+            } else if let key = store.selectedItem, let item = store.schema?.item(key) {
                 switch item.kind {
                 case .collection: CollectionView(item: item).id(item.key)
                 case .singleton: SingletonView(item: item).id(item.key)
@@ -103,6 +107,7 @@ struct ContentView: View {
 
 struct SidebarView: View {
     @Environment(SiteStore.self) private var store
+    @Environment(DraftInbox.self) private var inbox
 
     var body: some View {
         @Bindable var store = store
@@ -116,6 +121,13 @@ struct SidebarView: View {
                                 .tag(item.key)
                         }
                     }
+                }
+            }
+            if store.schema?.item(InboxView.postsKey) != nil {
+                Section("iA Writer") {
+                    Label(inbox.folder.lastPathComponent, systemImage: "tray")
+                        .badge(inbox.drafts.count)
+                        .tag(DraftInbox.sidebarKey)
                 }
             }
             if !store.problems.isEmpty {
