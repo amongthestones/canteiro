@@ -41,7 +41,7 @@ It started as the editor for one site and is in daily use there, but nothing abo
 ## What it needs
 
 - **macOS 26** (Tahoe) or later.
-- **Xcode 26** or its command line tools, to compile it. There's no signed download yet.
+- **Xcode 26** or its command line tools, only if you make it from the sources.
 - **An Astro site with a `keystatic.config.ts`** at the root of its repo. Canteiro reads the config, so the site needs its `node_modules` installed (`npm install`).
 - **Node.** Homebrew's is fine. Canteiro looks in `/opt/homebrew/bin`, `/usr/local/bin` and `~/.volta/bin`, then asks your login shell.
 - **git, already signed in** to your remote (SSH keys or a credential helper). Canteiro never asks for a password: a push that needs one fails with a message instead of hanging.
@@ -49,6 +49,10 @@ It started as the editor for one site and is in daily use there, but nothing abo
 - For photos and audio: **a Cloudflare R2 bucket** with a public address, and an R2 API token with Object Read & Write on it. Without these, everything else still works.
 
 ## Install
+
+Download `Canteiro-<version>.zip` from [Releases](https://github.com/amongthestones/canteiro/releases/latest), unzip it, and move `Canteiro.app` to Applications. It's signed with a Developer ID and notarized by Apple, so it opens like any other app.
+
+To make it from the sources instead:
 
 ```sh
 git clone https://github.com/amongthestones/canteiro.git
@@ -63,7 +67,9 @@ To run it from the sources without installing:
 swift run
 ```
 
-The app isn't signed with a Developer ID, so a copy made on one Mac and opened on another will be stopped by Gatekeeper. Make your copy on the Mac you'll use it on.
+A copy made this way is signed only for the Mac it was made on, so Gatekeeper will stop it on another one.
+
+To make a signed, notarized release, run `./scripts/package-app.sh --release`. It needs a Developer ID Application certificate in your keychain and notarytool credentials saved once (the script's header shows the command). It leaves `dist/Canteiro-<version>.zip` and takes the version from the latest `v*` tag.
 
 ## First run
 
@@ -306,7 +312,7 @@ Only the editor reads this. How the site renders it is up to the site.
 - **R2 only** for uploads. Other S3 services aren't wired up, and images can't be saved into the repo.
 - **One site at a time**, and one person: no accounts, no sharing, no locking.
 - **Mac only.** There's no iPhone or iPad version. The inbox is the way to write on the phone.
-- **Not signed or notarized**, so you make your own copy from the sources.
+- **No automatic updates.** Download a new release from GitHub when there is one.
 - **Some field types are read-only:** `file`, `image`, and Keystatic's `document` and other rich-content fields. Canteiro shows them and leaves them unchanged.
 - **Tables in Rich** use the colons for alignment but have no editing tools: you still type the pipes.
 - **Keystatic's `itemLabel` functions** can't be read, so lists use the first text field as the title.
@@ -344,6 +350,8 @@ CANTEIRO_TEST_SITE=~/Sites/my-site swift test
 | `Git.swift`, `PublishSheet.swift` | Changes, diffs, commit and push |
 | `ListFilter.swift`, `NewEntry.swift` | The list filter and new entries |
 | `Subprocess.swift` | Running Node, git and `cwebp` |
+
+The icon is `Resources/AppIcon.icon`, in Icon Composer's format: a stone fill with a tau cut into it like a mason's mark. `scripts/make-icon.py` draws it, and `package-app.sh` compiles it with Xcode's `actool`, so macOS 26 can show it in its light, dark and tinted styles. Change the script and run it again rather than editing the icon by hand.
 
 ## License
 
