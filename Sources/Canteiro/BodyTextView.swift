@@ -12,6 +12,8 @@ import UniformTypeIdentifiers
 struct BodyTextView: NSViewRepresentable {
     @Binding var text: String
     var mode: BodyMode = .markdown
+    /// The site's markdown extras to style, from canteiro.json.
+    var syntax: Set<SiteConfig.Syntax> = []
     var minHeight: CGFloat = 320
     /// Turns a dropped photo into the markdown to insert (`![](https://…)`).
     var uploadPhoto: (@MainActor (URL) async throws -> String)?
@@ -46,7 +48,7 @@ struct BodyTextView: NSViewRepresentable {
 
     func updateNSView(_ view: BodyNSTextView, context: Context) {
         let coordinator = context.coordinator
-        let modeChanged = coordinator.parent.mode != mode
+        let modeChanged = coordinator.parent.mode != mode || coordinator.parent.syntax != syntax
         coordinator.parent = self
         if view.string != text {
             view.string = text
@@ -75,7 +77,7 @@ struct BodyTextView: NSViewRepresentable {
 
         func restyle() {
             guard let view, let storage = view.textStorage else { return }
-            MarkdownStyler.style(storage, mode: parent.mode)
+            MarkdownStyler.style(storage, mode: parent.mode, syntax: parent.syntax)
             view.typingAttributes = MarkdownStyler.baseAttributes(parent.mode)
             measured = nil
             // A grid moves with its table, and TextKit only redraws the text.

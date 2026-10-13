@@ -8,10 +8,10 @@ enum BodyMode: String {
 
 /// Styles the body's markdown in place. Markdown: a mono font with the marks
 /// faded, as iA Writer does. Rich: a reading font with the marks hidden and
-/// the result shown. Covers the site's own syntax too: ==highlights==,
-/// [^inline footnotes], ^^^callouts^^^ and {{TOC}}.
+/// the result shown. A site's own syntax, from its canteiro.json, comes on
+/// top: ==highlights==, [^inline footnotes], ^^^callouts^^^ and {{TOC}}.
 enum MarkdownStyler {
-    static func style(_ storage: NSTextStorage, mode: BodyMode) {
+    static func style(_ storage: NSTextStorage, mode: BodyMode, syntax: Set<SiteConfig.Syntax> = []) {
         let text = storage.string as NSString
         let all = NSRange(location: 0, length: text.length)
         let rich = mode == .rich
@@ -60,10 +60,12 @@ enum MarkdownStyler {
             mark(NSRange(location: NSMaxRange(m.range) - 1, length: 1))
         }
         // ==highlight==
-        each(#"==(?=\S)(.+?)(?<=\S)=="#) { m in
-            storage.addAttribute(.backgroundColor, value: NSColor.systemYellow.withAlphaComponent(0.35), range: m.range(at: 1))
-            mark(NSRange(location: m.range.location, length: 2))
-            mark(NSRange(location: NSMaxRange(m.range) - 2, length: 2))
+        if syntax.contains(.highlight) {
+            each(#"==(?=\S)(.+?)(?<=\S)=="#) { m in
+                storage.addAttribute(.backgroundColor, value: NSColor.systemYellow.withAlphaComponent(0.35), range: m.range(at: 1))
+                mark(NSRange(location: m.range.location, length: 2))
+                mark(NSRange(location: NSMaxRange(m.range) - 2, length: 2))
+            }
         }
         // `code`
         each(#"`([^`\n]+)`"#) { m in
@@ -73,13 +75,15 @@ enum MarkdownStyler {
             mark(NSRange(location: NSMaxRange(m.range) - 1, length: 1))
         }
         // [^an inline footnote], iA Writer's kind: small and raised in Rich.
-        each(#"\[\^([^\]]+)\]"#) { m in
-            storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: m.range(at: 1))
-            if rich {
-                storage.addAttributes([.font: NSFont.systemFont(ofSize: 11), .baselineOffset: 5], range: m.range(at: 1))
+        if syntax.contains(.inlineFootnotes) {
+            each(#"\[\^([^\]]+)\]"#) { m in
+                storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: m.range(at: 1))
+                if rich {
+                    storage.addAttributes([.font: NSFont.systemFont(ofSize: 11), .baselineOffset: 5], range: m.range(at: 1))
+                }
+                mark(NSRange(location: m.range.location, length: 2))
+                mark(NSRange(location: NSMaxRange(m.range) - 1, length: 1))
             }
-            mark(NSRange(location: m.range.location, length: 2))
-            mark(NSRange(location: NSMaxRange(m.range) - 1, length: 1))
         }
         // [links](url "title"), not images.
         each(#"(?<!!)\[([^\]\n]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)"#) { m in
@@ -94,12 +98,14 @@ enum MarkdownStyler {
             if rich { storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 12), range: m.range) }
         }
         // ^^^callouts^^^, one line or fenced.
-        each(#"\^\^\^([\s\S]*?)\^\^\^"#, []) { m in
-            if rich { storage.addAttribute(.backgroundColor, value: NSColor.quaternaryLabelColor.withAlphaComponent(0.12), range: m.range(at: 1)) }
-            mark(NSRange(location: m.range.location, length: 3))
-            mark(NSRange(location: NSMaxRange(m.range) - 3, length: 3))
+        if syntax.contains(.callouts) {
+            each(#"\^\^\^([\s\S]*?)\^\^\^"#, []) { m in
+                if rich { storage.addAttribute(.backgroundColor, value: NSColor.quaternaryLabelColor.withAlphaComponent(0.12), range: m.range(at: 1)) }
+                mark(NSRange(location: m.range.location, length: 3))
+                mark(NSRange(location: NSMaxRange(m.range) - 3, length: 3))
+            }
         }
-        // > quotes, list markers, rules, {{TOC}}: faded in both views.
+        // > quotes, list markers, rules and {{TOC}}: faded in both views.
         each(#"^(>[ \t]?)(.*)$"#) { m in
             storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: m.range(at: 1))
             if rich { storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: m.range(at: 2)) }
@@ -110,8 +116,10 @@ enum MarkdownStyler {
         each(#"^(\*\*\*|---|___)[ \t]*$"#) { m in
             storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: m.range)
         }
-        each(#"\{\{TOC\}\}"#) { m in
-            storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: m.range)
+        if syntax.contains(.toc) {
+            each(#"\{\{TOC\}\}"#) { m in
+                storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: m.range)
+            }
         }
         // Tables last, so cells are measured with their links and bold done.
         for table in tables(in: text) {

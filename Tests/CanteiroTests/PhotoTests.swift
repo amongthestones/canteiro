@@ -40,7 +40,7 @@ import Testing
 
     @Test func keysFollowTheUploadsLayout() {
         let date = ISO8601DateFormatter().date(from: "2026-10-04T12:00:00Z")!
-        #expect(PhotoProcessor.key(for: URL(fileURLWithPath: "/x/Cemitério à Eirexe.HEIC"), date: date) == "uploads/2026/10/cemiterio-a-eirexe.webp")
+        #expect(PhotoProcessor.key(for: URL(fileURLWithPath: "/x/Cemitério à Eirexe.HEIC"), in: SiteConfig().photoFolder(date: date)) == "uploads/2026/10/cemiterio-a-eirexe.webp")
         #expect(Slug.make("IMG_2041") == "img-2041")
     }
 }

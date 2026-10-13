@@ -63,7 +63,7 @@ struct EntryEditor: View {
                     Divider()
                 }
                 if item.bodyField != nil {
-                    BodyTextView(text: $text, mode: bodyMode, uploadPhoto: uploadPhoto, onError: { store.lastError = $0 })
+                    BodyTextView(text: $text, mode: bodyMode, syntax: store.config.extras, uploadPhoto: uploadPhoto, onError: { store.lastError = $0 })
                         .padding(.top, 18)
                 }
             }
@@ -72,6 +72,7 @@ struct EntryEditor: View {
             .frame(maxWidth: 820, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .environment(\.guidField, store.isEpisodes(item) ? store.config.guidField : nil)
         .autosave(item, id: entry.id, data: data, body: item.bodyField == nil ? nil : lead + text)
     }
 }
@@ -83,7 +84,7 @@ extension EntryEditor {
     static func photoUploader(_ store: SiteStore) -> @MainActor (URL) async throws -> String {
         { [store] file in
             let result = try await Task.detached { try PhotoProcessor.process(file) }.value
-            let url = try await store.upload(result.file, key: PhotoProcessor.key(for: file), contentType: "image/webp",
+            let url = try await store.upload(result.file, key: PhotoProcessor.key(for: file, in: store.config.photoFolder(date: .now)), contentType: "image/webp",
                                              name: file.lastPathComponent)
             return "![](\(url))"
         }

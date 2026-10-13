@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import Observation
 
-/// A draft written in iA Writer, waiting in its Blog folder.
+/// A draft waiting in the inbox folder.
 struct InboxDraft: Identifiable, Hashable {
     var id: URL { url }
     let url: URL
@@ -12,17 +12,17 @@ struct InboxDraft: Identifiable, Hashable {
     let preview: String
 }
 
-/// iA Writer's Blog folder in iCloud. Drafts are written there, on the phone
-/// or the Mac, and imported as posts. An imported file moves to Imported/,
-/// so a piece only ever lives in one place: iA Writer until it's imported,
-/// the site after.
+/// A writing app's folder, from the site's canteiro.json: iA Writer's Blog
+/// folder in iCloud, for Among the Stones. Drafts are written there, on the
+/// phone or the Mac, and imported as entries. An imported file moves to
+/// Imported/, so a piece only ever lives in one place: the writing app until
+/// it's imported, the site after.
 @MainActor @Observable
 final class DraftInbox {
     /// The sidebar's tag for the inbox. Schema keys never have a dot.
     static let sidebarKey = "canteiro.inbox"
+    /// A folder chosen on this Mac, over the site's.
     private static let folderKey = "inboxPath"
-    static let defaultFolder = FileManager.default.homeDirectoryForCurrentUser
-        .appending(path: "Library/Mobile Documents/27N4MQEA55~pro~writer/Documents/Blog", directoryHint: .isDirectory)
 
     private(set) var drafts: [InboxDraft] = []
     var selected: URL?
@@ -35,12 +35,31 @@ final class DraftInbox {
     private(set) var saveErrors: [URL: String] = [:]
     /// Why the folder can't be read, if it can't.
     private(set) var problem: String?
-    private(set) var folder: URL
+    /// Nil when the site has no inbox.
+    private(set) var folder: URL?
+    /// The collection drafts become entries of.
+    private(set) var collection: String?
+    /// "iA Writer", or a stand-in when the config doesn't name the app.
+    private(set) var app = "the writing app"
     private var watcher: DispatchSourceFileSystemObject?
 
-    /// A folder for tests; else the one chosen, or iA Writer's Blog.
-    init(folder: URL? = nil) {
-        self.folder = folder ?? UserDefaults.standard.string(forKey: Self.folderKey).map { URL(filePath: $0, directoryHint: .isDirectory) } ?? Self.defaultFolder
+    /// No folder until a site with an inbox opens; tests pass one.
+    init(folder: URL? = nil, collection: String? = nil) {
+        self.folder = folder
+        self.collection = collection
+        refresh()
+        watch()
+    }
+
+    /// Follows the open site: its inbox, or none.
+    func configure(_ config: SiteConfig) {
+        let chosen = UserDefaults.standard.string(forKey: Self.folderKey).map { URL(filePath: $0, directoryHint: .isDirectory) }
+        let next = config.inboxFolder.map { chosen ?? $0 }
+        collection = config.inbox?.importInto
+        app = config.inbox?.app ?? "the writing app"
+        guard next != folder else { return }
+        folder = next
+        selected = nil
         refresh()
         watch()
     }
@@ -51,8 +70,8 @@ final class DraftInbox {
         panel.canChooseFiles = false
         panel.directoryURL = folder
         panel.prompt = "Watch"
-        panel.message = "Choose the iA Writer folder your blog drafts go in."
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        panel.message = "Choose the folder in \(app) your drafts go in."
+        guard panel.runModal() == .OK, let url = panel.url, folder != nil else { return }
         folder = url
         UserDefaults.standard.set(url.path, forKey: Self.folderKey)
         refresh()
@@ -61,6 +80,11 @@ final class DraftInbox {
 
     func refresh() {
         let fm = FileManager.default
+        guard let folder else {
+            drafts = []
+            problem = nil
+            return
+        }
         do {
             let names = try fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey])
             // A file iCloud hasn't brought down yet is a hidden .Name.md.icloud;
@@ -169,7 +193,7 @@ final class DraftInbox {
         return (try? String(contentsOf: url, encoding: .utf8)) != known
     }
 
-    /// Makes the draft a post (a draft there too) and moves the file to
+    /// Makes the draft an entry (a draft there too) and moves the file to
     /// Imported/.
     func importDraft(_ draft: InboxDraft, into item: SchemaItem, store: SiteStore) throws {
         save(draft.url)
@@ -182,7 +206,7 @@ final class DraftInbox {
         values["draft"] = nil
         try store.createEntry(item, title: parsed.title, body: parsed.body, values: values)
 
-        let done = folder.appending(path: "Imported", directoryHint: .isDirectory)
+        guard let done = folder?.appending(path: "Imported", directoryHint: .isDirectory) else { return }
         try FileManager.default.createDirectory(at: done, withIntermediateDirectories: true)
         var target = done.appending(path: draft.url.lastPathComponent)
         var n = 2
@@ -198,13 +222,15 @@ final class DraftInbox {
     enum ImportFailure: LocalizedError {
         case conflict
         var errorDescription: String? {
-            "The file changed in iA Writer since Canteiro read it. Choose which version to keep first."
+            "The file changed elsewhere since Canteiro read it. Choose which version to keep first."
         }
     }
 
     /// Refreshes when a file is added, removed or renamed in the folder.
     private func watch() {
         watcher?.cancel()
+        watcher = nil
+        guard let folder else { return }
         let fd = Darwin.open(folder.path, O_EVTONLY)
         guard fd >= 0 else { return }
         let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .rename, .delete], queue: .main)

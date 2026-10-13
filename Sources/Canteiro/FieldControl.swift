@@ -3,6 +3,7 @@ import SwiftUI
 /// One field's control, picked by its Keystatic type.
 struct FieldControl: View {
     @Environment(\.inSettingsForm) private var inSettingsForm
+    @Environment(\.guidField) private var guidField
     let spec: FieldSpec
     @Binding var value: FieldValue
     var slug: String?
@@ -33,7 +34,7 @@ struct FieldControl: View {
                         .foregroundStyle(.secondary)
                 }
             }
-        case "text" where spec.key == "guid" && !value.isEmpty:
+        case "text" where spec.key == guidField && !value.isEmpty:
             // Podcast apps track an episode by its guid: set once, never changed.
             HStack(spacing: 6) {
                 Image(systemName: "lock.fill").foregroundStyle(.secondary).font(.caption)
@@ -437,4 +438,9 @@ struct FlowLayout: Layout {
         }
         return rows
     }
+}
+
+extension EnvironmentValues {
+    /// An episode's guid field, which locks once set. Nil outside podcasts.
+    @Entry var guidField: String?
 }

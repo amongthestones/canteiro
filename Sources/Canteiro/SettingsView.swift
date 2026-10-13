@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// Canteiro › Settings: where uploads go. Keys are stored in the Keychain.
+/// Canteiro › Settings: the Cloudflare account uploads use. Keys are stored
+/// in the Keychain. The bucket and address are the site's, in its
+/// canteiro.json, and only shown here.
 struct SettingsView: View {
+    @Environment(SiteStore.self) private var store
     @State private var accountID = R2Settings.accountID
-    @State private var bucket = R2Settings.bucket
-    @State private var publicBase = R2Settings.publicBase
     @State private var accessKeyID = R2Settings.accessKeyID
     @State private var secret = R2Settings.secretAccessKey
     @State private var status: Status = .idle
@@ -18,12 +19,16 @@ struct SettingsView: View {
         Form {
             Section {
                 TextField("Account ID", text: $accountID, prompt: Text("From the R2 overview page"))
-                TextField("Bucket", text: $bucket)
-                TextField("Public address", text: $publicBase)
+                if let uploads = store.config.uploads {
+                    LabeledContent("Bucket", value: uploads.bucket)
+                    LabeledContent("Public address", value: uploads.publicBase)
+                }
             } header: {
                 Text("Cloudflare R2")
             } footer: {
-                Text("Photos go to uploads/YYYY/MM/ and episodes to podcasts/<show>/. Links use the public address.")
+                Text(store.config.uploads == nil
+                     ? "\(store.siteName) has no uploads block in \(SiteConfig.fileName), so photo and MP3 drops are off."
+                     : "The bucket and address come from \(store.siteName)'s \(SiteConfig.fileName).")
                     .foregroundStyle(.secondary)
             }
             Section {
@@ -56,14 +61,13 @@ struct SettingsView: View {
 
     private func saveAndCheck() {
         R2Settings.accountID = accountID.trimmingCharacters(in: .whitespacesAndNewlines)
-        R2Settings.bucket = bucket.trimmingCharacters(in: .whitespacesAndNewlines)
-        R2Settings.publicBase = publicBase.trimmingCharacters(in: .whitespacesAndNewlines)
         R2Settings.accessKeyID = accessKeyID.trimmingCharacters(in: .whitespacesAndNewlines)
         R2Settings.secretAccessKey = secret.trimmingCharacters(in: .whitespacesAndNewlines)
         status = .checking
         Task {
             do {
-                try await R2Client.fromSettings().check()
+                guard let bucket = store.config.uploads?.bucket else { throw SiteStore.UploadFailure.noUploads }
+                try await R2Client.fromSettings(bucket: bucket).check()
                 status = .ok
             } catch {
                 status = .failed(error.localizedDescription)

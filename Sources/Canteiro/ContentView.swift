@@ -60,6 +60,7 @@ struct ContentView: View {
             NSApp.activate()
             openWindow(id: "aside")
         }
+        .onChange(of: store.config, initial: true) { inbox.configure(store.config) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Catch commits and edits made outside the app.
             store.refreshChanges()
@@ -123,9 +124,9 @@ struct SidebarView: View {
                     }
                 }
             }
-            if store.schema?.item(InboxView.postsKey) != nil {
-                Section("iA Writer") {
-                    Label(inbox.folder.lastPathComponent, systemImage: "tray")
+            if let folder = inbox.folder, let key = inbox.collection, store.schema?.item(key) != nil {
+                Section("Inbox") {
+                    Label(folder.lastPathComponent, systemImage: "tray")
                         .badge(inbox.drafts.count)
                         .tag(DraftInbox.sidebarKey)
                 }

@@ -13,7 +13,8 @@ import Testing
         let fm = FileManager.default
         let copy = fm.temporaryDirectory.appending(path: "canteiro-test-\(UUID().uuidString)")
         try fm.createDirectory(at: copy, withIntermediateDirectories: true)
-        for name in ["keystatic.config.ts", "package.json", "src"] {
+        for name in ["keystatic.config.ts", "package.json", "src", SiteConfig.fileName]
+            where fm.fileExists(atPath: Self.site.appending(path: name).path) {
             try fm.copyItem(at: Self.site.appending(path: name), to: copy.appending(path: name))
         }
         try fm.createSymbolicLink(at: copy.appending(path: "node_modules"), withDestinationURL: Self.site.appending(path: "node_modules"))

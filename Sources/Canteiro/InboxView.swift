@@ -1,11 +1,10 @@
 import SwiftUI
 
-/// The drafts waiting in iA Writer's Blog folder: the list on the left, the
-/// selected one on the right, as a collection is shown. Edits save to the
-/// iA Writer file; Import makes it a post.
+/// The drafts waiting in the inbox folder (iA Writer's Blog, for Among the
+/// Stones): the list on the left, the selected one on the right, as a
+/// collection is shown. Edits save to the draft's file; Import makes it an
+/// entry.
 struct InboxView: View {
-    /// Drafts become entries of this collection.
-    static let postsKey = "posts"
     @Environment(SiteStore.self) private var store
     @Environment(DraftInbox.self) private var inbox
     @AppStorage("listWidth") private var listWidth = 320.0
@@ -37,7 +36,7 @@ struct InboxView: View {
                             ContentUnavailableView {
                                 Label("No Drafts Waiting", systemImage: "tray")
                             } description: {
-                                Text("Drafts you save in iA Writer's \(inbox.folder.lastPathComponent) folder show up here, from the phone or the Mac.")
+                                Text("Drafts you save in \(inbox.folder?.lastPathComponent ?? "the inbox folder") show up here, from the phone or the Mac.")
                             }
                         }
                     }
@@ -55,18 +54,18 @@ struct InboxView: View {
                 }
             }
         }
-        .navigationSubtitle("iA Writer · \(inbox.drafts.count)")
+        .navigationSubtitle("Inbox · \(inbox.drafts.count)")
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                Button("Import as Post", systemImage: "square.and.arrow.down") {
+                Button("Import", systemImage: "square.and.arrow.down") {
                     if let draft = selectedDraft { importDraft(draft) }
                 }
-                .help("Make it a post, as a draft, and move the file to Imported in iA Writer")
+                .help("Make it a draft \(importLabel), and move the file to Imported in \(inbox.app)")
                 .disabled(selectedDraft == nil)
             }
             ToolbarItem(placement: .navigation) {
                 Menu("Folder", systemImage: "folder") {
-                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([inbox.folder]) }
+                    Button("Show in Finder") { inbox.folder.map { NSWorkspace.shared.activateFileViewerSelecting([$0]) } }
                     Button("Choose Folder…") { inbox.chooseFolder() }
                 }
             }
@@ -79,8 +78,13 @@ struct InboxView: View {
         .onAppear { inbox.refresh() }
     }
 
+    /// "in Posts", from the collection's label.
+    private var importLabel: String {
+        inbox.collection.flatMap { store.schema?.item($0) }.map { "in \($0.label)" } ?? "entry"
+    }
+
     private func importDraft(_ draft: InboxDraft) {
-        guard let item = store.schema?.item(Self.postsKey) else { return }
+        guard let key = inbox.collection, let item = store.schema?.item(key) else { return }
         do {
             try inbox.importDraft(draft, into: item, store: store)
         } catch {
@@ -129,7 +133,7 @@ struct DraftEditor: View {
 
     var body: some View {
         ScrollView {
-            BodyTextView(text: $text, mode: bodyMode, uploadPhoto: EntryEditor.photoUploader(store),
+            BodyTextView(text: $text, mode: bodyMode, syntax: store.config.extras, uploadPhoto: EntryEditor.photoUploader(store),
                          onError: { store.lastError = $0 })
                 .padding(.horizontal, 32)
                 .padding(.vertical, 18)
@@ -168,8 +172,8 @@ struct DraftEditor: View {
     private var banner: some View {
         if inbox.conflicts.contains(draft.url) {
             Bar(systemImage: "exclamationmark.triangle.fill", tint: .orange,
-                     text: "This draft changed in iA Writer since Canteiro read it. Your edits aren't saved.") {
-                Button("Use iA Writer's Version") {
+                     text: "This draft changed in \(inbox.app) since Canteiro read it. Your edits aren't saved.") {
+                Button("Use the File on Disk") {
                     inbox.revert(draft.url)
                     text = inbox.open(draft.url)
                 }

@@ -46,6 +46,7 @@ struct CanteiroApp: App {
 
         Settings {
             SettingsView()
+                .environment(store)
         }
         .commands {
             SaveCommand()

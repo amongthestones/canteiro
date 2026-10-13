@@ -8,7 +8,7 @@ import Testing
 
     private func styled(_ mode: BodyMode) -> NSTextStorage {
         let storage = NSTextStorage(string: text)
-        MarkdownStyler.style(storage, mode: mode)
+        MarkdownStyler.style(storage, mode: mode, syntax: Set(SiteConfig.Syntax.allCases))
         return storage
     }
 

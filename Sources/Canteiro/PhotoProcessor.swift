@@ -68,10 +68,10 @@ enum PhotoProcessor {
         return Result(file: out, width: resized.width, height: resized.height, bytesBefore: before, bytesAfter: after)
     }
 
-    /// uploads/2026/10/cemiterio-a-eirexe.webp, as WordPress laid them out.
-    static func key(for source: URL, date: Date = .now) -> String {
-        let parts = Calendar(identifier: .gregorian).dateComponents(in: TimeZone(identifier: "UTC")!, from: date)
-        return String(format: "uploads/%04d/%02d/", parts.year!, parts.month!) + Slug.make(source.deletingPathExtension().lastPathComponent) + ".webp"
+    /// The photo's name for the web in the site's photo folder:
+    /// uploads/2026/10/cemiterio-a-eirexe.webp.
+    static func key(for source: URL, in folder: String) -> String {
+        folder + Slug.make(source.deletingPathExtension().lastPathComponent) + ".webp"
     }
 }
 

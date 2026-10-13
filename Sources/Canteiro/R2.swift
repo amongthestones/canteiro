@@ -2,24 +2,13 @@ import CryptoKit
 import Foundation
 import Security
 
-/// Where uploads go: the R2 bucket and the public address files are served at.
-/// The keys live in the Keychain; the rest in the app's settings.
+/// The Cloudflare account uploads use. The keys live in the Keychain, the
+/// account ID in the app's settings. The bucket and public address are the
+/// site's, in its canteiro.json.
 enum R2Settings {
     static var accountID: String {
         get { UserDefaults.standard.string(forKey: "r2AccountID") ?? "" }
         set { UserDefaults.standard.set(newValue, forKey: "r2AccountID") }
-    }
-
-    static var bucket: String {
-        get { UserDefaults.standard.string(forKey: "r2Bucket") ?? "amongthestones-media" }
-        set { UserDefaults.standard.set(newValue, forKey: "r2Bucket") }
-    }
-
-    /// The bucket's public address. The site's README: audio links use
-    /// media.amongthestones.com, never r2.dev.
-    static var publicBase: String {
-        get { UserDefaults.standard.string(forKey: "r2PublicBase") ?? "https://media.amongthestones.com" }
-        set { UserDefaults.standard.set(newValue, forKey: "r2PublicBase") }
     }
 
     static var accessKeyID: String {
@@ -33,11 +22,7 @@ enum R2Settings {
     }
 
     static var isComplete: Bool {
-        !accountID.isEmpty && !bucket.isEmpty && !publicBase.isEmpty && !accessKeyID.isEmpty && !secretAccessKey.isEmpty
-    }
-
-    static func publicURL(for key: String) -> String {
-        publicBase.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/" + key
+        !accountID.isEmpty && !accessKeyID.isEmpty && !secretAccessKey.isEmpty
     }
 }
 
@@ -97,9 +82,9 @@ struct R2Client: Sendable {
     let accessKeyID: String
     let secretAccessKey: String
 
-    static func fromSettings() throws -> R2Client {
+    static func fromSettings(bucket: String) throws -> R2Client {
         guard R2Settings.isComplete else { throw Failure.notSetUp }
-        return R2Client(accountID: R2Settings.accountID, bucket: R2Settings.bucket,
+        return R2Client(accountID: R2Settings.accountID, bucket: bucket,
                         accessKeyID: R2Settings.accessKeyID, secretAccessKey: R2Settings.secretAccessKey)
     }
 

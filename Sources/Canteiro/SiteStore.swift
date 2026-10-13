@@ -17,6 +17,8 @@ final class SiteStore {
     private(set) var phase: Phase = .noSite
     private(set) var siteURL: URL?
     private(set) var schema: SiteSchema?
+    /// The site's canteiro.json, or the empty config.
+    private(set) var config = SiteConfig()
     private(set) var entries: [String: [Entry]] = [:]
     private(set) var singletons: [String: Entry] = [:]
     /// Files that didn't parse. Shown, not hidden: a broken file is worth knowing about.
@@ -92,6 +94,12 @@ final class SiteStore {
             entries = loaded.entries
             singletons = loaded.singletons
             problems = loaded.problems
+            do {
+                config = try SiteConfig.load(site: url)
+            } catch {
+                config = SiteConfig()
+                problems.insert(error.localizedDescription, at: 0)
+            }
             refreshChanges()
             if selectedItem == nil || schema.item(selectedItem!) == nil {
                 selectedItem = schema.groups.first?.items.first?.key
@@ -324,20 +332,22 @@ final class SiteStore {
         try create(item, slug: slug, data: newData(item, values))
     }
 
-    /// A collection of podcast episodes: entries with an audio address.
+    /// A collection of podcast episodes: one canteiro.json names, with an
+    /// audio address field.
     func isEpisodes(_ item: SchemaItem) -> Bool {
-        item.kind == .collection && item.dataFields.contains { $0.key == "audioUrl" }
+        item.kind == .collection && config.isEpisodes(item.key)
+            && item.dataFields.contains { $0.key == config.audioField }
     }
 
     /// A dropped MP3 becomes a draft episode: its length read, the file put
-    /// on R2 under podcasts/<show>/, the next number and a guid filled in.
+    /// on R2 in the show's audio folder, the next number and a guid filled in.
     func createEpisode(_ item: SchemaItem, from file: URL) async {
         do {
             let show = URL(fileURLWithPath: item.folder).lastPathComponent
             let seconds = try await AVURLAsset(url: file).load(.duration).seconds
             let base = Slug.make(file.deletingPathExtension().lastPathComponent)
-            let key = "podcasts/\(show)/\(base).\(file.pathExtension.lowercased())"
-            let number = (entries[item.key]?.compactMap { $0.data["episodeNumber"]?.int }.max() ?? 0) + 1
+            let key = config.audioFolder(show: show) + "\(base).\(file.pathExtension.lowercased())"
+            let number = (entries[item.key]?.compactMap { $0.data[config.numberField]?.int }.max() ?? 0) + 1
             let url = try await upload(file, key: key, contentType: "audio/mpeg", name: file.lastPathComponent)
             try addEpisode(item, slug: base, number: number, seconds: seconds, audioURL: url)
         } catch {
@@ -355,10 +365,10 @@ final class SiteStore {
         set("title", .string("Episode \(number)"))
         set("draft", .bool(true))
         if let date = item.dateField { values[date.key] = Self.dateValue(.now, type: date.type) }
-        set("episodeNumber", .int(number))
-        set("guid", .string("\(show)-\(number)"))
-        set("audioUrl", .string(audioURL))
-        set("duration", .string(Self.duration(seconds)))
+        set(config.numberField, .int(number))
+        set(config.guidField, .string(config.guid(show: show, number: number)))
+        set(config.audioField, .string(audioURL))
+        set(config.durationField, .string(Self.duration(seconds)))
         set("mimeType", .string("audio/mpeg"))
         try create(item, slug: slug, data: newData(item, values), body: "")
     }
@@ -377,9 +387,10 @@ final class SiteStore {
         var progress: Double = 0
     }
 
-    /// Puts a file on R2 and returns its public address.
+    /// Puts a file in the site's bucket and returns its public address.
     func upload(_ file: URL, key: String, contentType: String, name: String) async throws -> String {
-        let client = try R2Client.fromSettings()
+        guard let bucket = config.uploads?.bucket, let address = config.publicURL(for: key) else { throw UploadFailure.noUploads }
+        let client = try R2Client.fromSettings(bucket: bucket)
         let upload = Upload(name: name)
         uploads.append(upload)
         defer { uploads.removeAll { $0.id == upload.id } }
@@ -388,7 +399,14 @@ final class SiteStore {
                 if let i = self.uploads.firstIndex(where: { $0.id == upload.id }) { self.uploads[i].progress = fraction }
             }
         }
-        return R2Settings.publicURL(for: key)
+        return address
+    }
+
+    enum UploadFailure: LocalizedError {
+        case noUploads
+        var errorDescription: String? {
+            "This site has no uploads set up. Add an \"uploads\" block with the bucket and public address to \(SiteConfig.fileName)."
+        }
     }
 
     nonisolated static func stamp(_ date: Date, _ format: String, utc: Bool = false) -> String {
