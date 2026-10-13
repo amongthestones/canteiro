@@ -1,9 +1,10 @@
 # Canteiro: plan
 
-Status: idea, sketch stage. 2026-10-04.
+Written 2026-10-04, before the app existed, as the plan for Among the Stones. Kept as it was, with these changes since:
 
-Clickable mockup of the main window:
-https://claude.ai/artifact/F4cPZstdV3y75Vsw7usWF2
+- What the app knew about that site by name (the R2 bucket and paths, podcast field names, the site's markdown extras) moved to the site's `canteiro.json`. See the README.
+- The iA Writer inbox was added: drafts written in iA Writer, on the phone or the Mac, are edited and imported from a sidebar section.
+- Rich tables, with columns, grid lines and alignment, came after the first version.
 
 ## Why
 
