@@ -52,6 +52,8 @@ It started as the editor for one site and is in daily use there, but nothing abo
 
 Download `Canteiro-<version>.zip` from [Releases](https://github.com/amongthestones/canteiro/releases/latest), unzip it, and move `Canteiro.app` to Applications. It's signed with a Developer ID and notarized by Apple, so it opens like any other app.
 
+What's new in each version is in [CHANGELOG.md](CHANGELOG.md).
+
 To make it from the sources instead:
 
 ```sh
