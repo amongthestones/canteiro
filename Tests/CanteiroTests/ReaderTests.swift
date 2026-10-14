@@ -51,4 +51,25 @@ import Testing
         #expect(pairs.map(\.key) == ["a", "b", "c", "d"])
         #expect(value["b"] == .int(20))
     }
+
+    /// One file that won't parse is named in problems; the rest still load.
+    @Test func aBadFileDoesNotHideTheRest() throws {
+        let fm = FileManager.default
+        // realpath, since the temporary folder is behind /var -> /private/var
+        // and the loader's paths must start with the site's.
+        let temp = URL(fileURLWithPath: String(cString: realpath(fm.temporaryDirectory.path, nil)))
+        let site = temp.appending(path: "canteiro-reader-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: site) }
+        let folder = site.appending(path: "src/content/posts")
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        try "---\ntitle: Good\n---\n\nBody\n".write(to: folder.appending(path: "good.md"), atomically: true, encoding: .utf8)
+        try "---\ntitle: Bad\ndescription: Draft: not quoted\n---\n".write(to: folder.appending(path: "bad.md"), atomically: true, encoding: .utf8)
+        let json = #"{"key":"posts","kind":"collection","label":"Posts","path":"src/content/posts/*","format":{"contentField":"content"},"fields":[{"key":"content","type":"markdoc","extension":"md"}]}"#
+        let item = try JSONDecoder().decode(SchemaItem.self, from: Data(json.utf8))
+
+        let read = ContentLoader.entries(of: item, in: site)
+        #expect(read.entries.map(\.slug) == ["good"])
+        #expect(read.problems.count == 1)
+        #expect(read.problems.first?.hasPrefix("src/content/posts/bad.md") == true)
+    }
 }

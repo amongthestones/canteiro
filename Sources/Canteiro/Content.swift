@@ -32,7 +32,9 @@ enum ContentLoader {
 
     /// Every entry of a collection. Keystatic's path ends in `*` (files in
     /// the folder) or `**` (files in any subfolder too).
-    static func entries(of item: SchemaItem, in site: URL) throws -> [Entry] {
+    /// A file that won't read is left out and named in `problems`, so one
+    /// bad file never hides the rest.
+    static func entries(of item: SchemaItem, in site: URL) -> (entries: [Entry], problems: [String]) {
         let recursive = item.path.hasSuffix("**")
         let folderPath = item.path.replacingOccurrences(of: "/**", with: "").replacingOccurrences(of: "/*", with: "")
         let folder = site.appending(path: folderPath, directoryHint: .isDirectory)
@@ -50,11 +52,18 @@ enum ContentLoader {
             files = names.filter { $0.pathExtension == ext }
         }
 
-        return try files.map { url in
+        var entries: [Entry] = []
+        var problems: [String] = []
+        for url in files {
             let relative = String(url.path.dropFirst(folder.path.count + 1))
             let slug = String(relative.dropLast(ext.count + 1))
-            return try read(url, slug: slug, site: site, hasBody: item.format.contentField != nil)
+            do {
+                entries.append(try read(url, slug: slug, site: site, hasBody: item.format.contentField != nil))
+            } catch {
+                problems.append(error.localizedDescription)
+            }
         }
+        return (entries, problems)
     }
 
     /// A singleton's one file, or nil when it hasn't been made yet.

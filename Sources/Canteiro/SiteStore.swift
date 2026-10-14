@@ -123,7 +123,9 @@ final class SiteStore {
             do {
                 switch item.kind {
                 case .collection:
-                    loaded.entries[item.key] = sorted(try ContentLoader.entries(of: item, in: site), item: item)
+                    let read = ContentLoader.entries(of: item, in: site)
+                    loaded.entries[item.key] = sorted(read.entries, item: item)
+                    loaded.problems += read.problems
                 case .singleton:
                     loaded.singletons[item.key] = try ContentLoader.singleton(item, in: site)
                 }
