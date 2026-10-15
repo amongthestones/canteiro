@@ -37,6 +37,7 @@ struct BodyTextView: NSViewRepresentable {
         view.isAutomaticTextReplacementEnabled = false
         view.isContinuousSpellCheckingEnabled = true
         view.string = text
+        view.syntax = syntax
         view.delegate = context.coordinator
         view.onImageFiles = { [weak coordinator = context.coordinator] files, index in
             coordinator?.insertPhotos(files, at: index) ?? false
@@ -50,6 +51,7 @@ struct BodyTextView: NSViewRepresentable {
         let coordinator = context.coordinator
         let modeChanged = coordinator.parent.mode != mode || coordinator.parent.syntax != syntax
         coordinator.parent = self
+        view.syntax = syntax
         if view.string != text {
             view.string = text
             coordinator.restyle()
@@ -152,6 +154,9 @@ struct BodyTextView: NSViewRepresentable {
 /// their file paths, and draws the grid of Rich tables.
 final class BodyNSTextView: NSTextView {
     var onImageFiles: (([URL], Int) -> Bool)?
+    /// The site's markdown extras, so Highlight and Footnote only write
+    /// marks the site renders.
+    var syntax: Set<SiteConfig.Syntax> = []
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
@@ -202,5 +207,88 @@ final class BodyNSTextView: NSTextView {
             if onImageFiles(photos, index) { return true }
         }
         return super.performDragOperation(sender)
+    }
+}
+
+/// The Format menu's actions. The menu sends them to whatever has focus, so
+/// they only act in the body editor.
+extension BodyNSTextView {
+    @objc func formatBold(_ sender: Any?) { wrap("**", "Bold") }
+    @objc func formatItalic(_ sender: Any?) { wrap("*", "Italic") }
+    @objc func formatStrikethrough(_ sender: Any?) { wrap("~~", "Strikethrough") }
+    @objc func formatCode(_ sender: Any?) { wrap("`", "Code") }
+
+    @objc func formatHighlight(_ sender: Any?) {
+        guard syntax.contains(.highlight) else { return NSSound.beep() }
+        wrap("==", "Highlight")
+    }
+
+    @objc func formatLink(_ sender: Any?) {
+        apply(MarkdownFormat.link(string, selectedRange(), clipboard: clipboard), "Link")
+    }
+
+    @objc func formatImage(_ sender: Any?) {
+        apply(MarkdownFormat.link(string, selectedRange(), clipboard: clipboard, image: true), "Image")
+    }
+
+    @objc func formatFootnote(_ sender: Any?) {
+        guard syntax.contains(.inlineFootnotes) else { return NSSound.beep() }
+        apply(MarkdownFormat.footnote(string, selectedRange()), "Footnote")
+    }
+
+    @objc func formatCodeBlock(_ sender: Any?) {
+        apply(MarkdownFormat.codeBlock(string, selectedRange()), "Code Block")
+    }
+
+    @objc func formatHeading1(_ sender: Any?) { heading(1) }
+    @objc func formatHeading2(_ sender: Any?) { heading(2) }
+    @objc func formatHeading3(_ sender: Any?) { heading(3) }
+    @objc func formatHeading4(_ sender: Any?) { heading(4) }
+    @objc func formatHeading5(_ sender: Any?) { heading(5) }
+    @objc func formatHeading6(_ sender: Any?) { heading(6) }
+
+    @objc func formatOrderedList(_ sender: Any?) {
+        apply(MarkdownFormat.line(string, selectedRange(), .orderedList), "Ordered List")
+    }
+
+    @objc func formatTaskList(_ sender: Any?) {
+        apply(MarkdownFormat.line(string, selectedRange(), .taskList), "Task List")
+    }
+
+    @objc func formatOrderedTaskList(_ sender: Any?) {
+        apply(MarkdownFormat.line(string, selectedRange(), .orderedTaskList), "Ordered Task List")
+    }
+
+    @objc func formatToggleTask(_ sender: Any?) {
+        apply(MarkdownFormat.toggleTask(string, selectedRange()), "Mark Task")
+    }
+
+    @objc func formatMoveLineUp(_ sender: Any?) {
+        apply(MarkdownFormat.moveLines(string, selectedRange(), up: true), "Move Line")
+    }
+
+    @objc func formatMoveLineDown(_ sender: Any?) {
+        apply(MarkdownFormat.moveLines(string, selectedRange(), up: false), "Move Line")
+    }
+
+    private var clipboard: String? { NSPasteboard.general.string(forType: .string) }
+
+    private func heading(_ level: Int) {
+        apply(MarkdownFormat.line(string, selectedRange(), .heading(level)), "Heading")
+    }
+
+    private func wrap(_ mark: String, _ name: String) {
+        apply(MarkdownFormat.wrap(string, selectedRange(), with: mark), name)
+    }
+
+    /// An undoable edit that SwiftUI hears about, then the new selection.
+    private func apply(_ edit: MarkdownFormat.Edit?, _ name: String) {
+        guard let edit else { return NSSound.beep() }
+        guard shouldChangeText(in: edit.range, replacementString: edit.text) else { return }
+        textStorage?.replaceCharacters(in: edit.range, with: edit.text)
+        didChangeText()
+        undoManager?.setActionName(name)
+        setSelectedRange(edit.selection)
+        scrollRangeToVisible(edit.selection)
     }
 }

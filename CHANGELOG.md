@@ -9,6 +9,7 @@ What changed in each version of Canteiro, newest first. Downloads are on [Releas
 - Settings has a General tab that checks the open site, its `keystatic.config.ts` and `canteiro.json`, where Publish pushes, the inbox folder, and the tools Canteiro runs (Node, git, cwebp, the site's packages), with a fix for anything missing.
 - Settings › Uploads says when the Keychain won't save a key, trims spaces and quotes from pasted keys, warns about keys of the wrong length, and remembers the last check.
 - A file that won't read no longer empties its whole list. The other entries still show, and Problems names the file.
+- A Format menu with iA Writer's shortcuts: bold, italic, code, headings, lists, tasks and more. ⌘K turns the selected words into a link to the URL on the clipboard.
 
 ## 0.1.0 (2026-10-13)
 

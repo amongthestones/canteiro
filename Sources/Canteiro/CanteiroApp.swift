@@ -52,6 +52,7 @@ struct CanteiroApp: App {
         .commands {
             SaveCommand()
             BodyModeCommand()
+            FormatCommands()
             CommandGroup(replacing: .newItem) {
                 NewEntryButton(inMenu: true)
                     .environment(store)

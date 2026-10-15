@@ -133,6 +133,8 @@ Rich is not a separate editor that converts to and from markdown. It's the same 
 
 Your site's own markdown extras can be styled too, if `canteiro.json` names them: `==highlights==`, iA Writer's `[^inline footnotes]`, `^^^callouts^^^` and `{{TOC}}`.
 
+The Format menu writes the marks for you, with iA Writer's shortcuts (listed under [Keyboard shortcuts](#keyboard-shortcuts)). Each one takes its marks off again if they're already there. Link (⌘K) uses the URL on the clipboard: copy a link, select some words, press ⌘K, and they become `[words](https://…)`. With no URL on the clipboard, the caret waits in the `()` for one. Highlight and Footnote only work when `canteiro.json` names those extras, so they never write marks your site shows as plain text.
+
 ### Saving
 
 - Changes save themselves a moment after you stop typing, on ⌘S, and when you leave the entry.
@@ -302,6 +304,20 @@ Only the editor reads this. How the site renders it is up to the site.
 | ⌘, | Settings |
 | Delete | Move the selected entry to the Trash |
 
+In the body, the Format menu follows iA Writer:
+
+| Shortcut | Action |
+|---|---|
+| ⌘B / ⌘I | Bold / italic |
+| ⌥⌘U / ⇧⌘U | Strikethrough / highlight |
+| ⌘J / ⇧⌘J | Code / code block |
+| ⌘K | Link, with the URL on the clipboard |
+| ⌥⌘K / ⌃⌘K | Image / inline footnote |
+| ⌘1 to ⌘6 | Heading 1 to 6 |
+| ⇧⌘L / ⌥⌘L / ⌥⇧⌘L | Ordered list / task list / ordered task list |
+| ⌥⌘X | Mark a task as done or not done |
+| ⌥⌘↑ / ⌥⌘↓ | Move the line up or down |
+
 ## How it works
 
 - **Reading the config.** `scripts/schema-dump.mjs` loads `keystatic.config.ts` through the site's own Vite, with the site's own Node, and prints it as JSON: the navigation, every collection and singleton, and every field with its type, label, help text, options, defaults and validation. It takes about a quarter of a second. Canteiro keeps no list of fields of its own.
@@ -355,6 +371,7 @@ CANTEIRO_TEST_SITE=~/Sites/my-site swift test
 | `EntryEditor.swift`, `FieldControl.swift`, `SettingsForm.swift` | Forms and field controls |
 | `AssetField.swift` | Image and file fields, and where their files go |
 | `BodyTextView.swift`, `MarkdownStyler.swift` | The body editor and its Markdown and Rich views |
+| `FormatCommands.swift`, `MarkdownFormat.swift` | The Format menu and the edits it makes |
 | `Autosave.swift` | Saving and the changed-on-disk bar |
 | `DraftInbox.swift`, `InboxView.swift` | The inbox |
 | `QuickAside.swift` | The aside window and its global shortcut |
