@@ -20,7 +20,7 @@ It started as the editor for one site and is in daily use there, but nothing abo
 ## What it needs
 
 - **macOS 26** (Tahoe) or later.
-- **An Astro site with a `keystatic.config.ts`** at the root of its repo, with `node_modules` installed.
+- **An Astro site with a `keystatic.config.ts`** at the root of its repo, with `node_modules` installed. Keystatic's [Astro guide](https://keystatic.com/docs/installation-astro) sets one up.
 - **Node** (Homebrew's is fine) and **git**, already signed in to your remote.
 - For photos: **`cwebp`** (`brew install webp`) and **a Cloudflare R2 bucket** with a public address. Without them, everything else still works.
 

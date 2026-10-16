@@ -27,22 +27,22 @@ Three columns, like Mail.
 
 ## Fields
 
-Each Keystatic field type gets a native control:
+Each Keystatic field type gets a native control. The names link to Keystatic's docs for setting up each field in your config.
 
 | Keystatic field | In Canteiro |
 |---|---|
-| `text` (one line or multiline), `url` | a text field, with a character count when the field has a maximum length |
-| `slug` | a text field with the address it makes shown under it |
-| `integer` | a number field |
-| `checkbox` | a switch |
-| `select` | a menu |
-| `multiselect` | the picked choices as tokens, with a menu to add more, or a single menu when only one can be picked |
-| `date`, `datetime` | a date picker |
-| `relationship` | a picker over the entries of the related collection |
-| `array` | a list of items you can add to and remove from |
-| `object` | its fields, grouped in a box |
-| `conditional` | a menu that swaps in the fields for each choice. A new choice starts its fields fresh |
-| `image`, `file` | the file's name, a preview for an image, and Choose… and Remove. Drop a file on it to use that one |
+| [`text`](https://keystatic.com/docs/fields/text) (one line or multiline), [`url`](https://keystatic.com/docs/fields/url) | a text field, with a character count when the field has a maximum length |
+| [`slug`](https://keystatic.com/docs/fields/slug) | a text field with the address it makes shown under it |
+| [`integer`](https://keystatic.com/docs/fields/integer) | a number field |
+| [`checkbox`](https://keystatic.com/docs/fields/checkbox) | a switch |
+| [`select`](https://keystatic.com/docs/fields/select) | a menu |
+| [`multiselect`](https://keystatic.com/docs/fields/multiselect) | the picked choices as tokens, with a menu to add more, or a single menu when only one can be picked |
+| [`date`](https://keystatic.com/docs/fields/date), [`datetime`](https://keystatic.com/docs/fields/datetime) | a date picker |
+| [`relationship`](https://keystatic.com/docs/fields/relationship) | a picker over the entries of the related collection |
+| [`array`](https://keystatic.com/docs/fields/array) | a list of items you can add to and remove from |
+| [`object`](https://keystatic.com/docs/fields/object) | its fields, grouped in a box |
+| [`conditional`](https://keystatic.com/docs/fields/conditional) | a menu that swaps in the fields for each choice. A new choice starts its fields fresh |
+| [`image`](https://keystatic.com/docs/fields/image), [`file`](https://keystatic.com/docs/fields/file) | the file's name, a preview for an image, and Choose… and Remove. Drop a file on it to use that one |
 
 A field type Canteiro doesn't know is shown as text and left alone. Unknown keys in a file's frontmatter are kept as they are.
 
