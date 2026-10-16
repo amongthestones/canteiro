@@ -345,19 +345,47 @@ struct ConditionalField: View {
     @Binding var value: FieldValue
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        Group {
             if let discriminant = spec.discriminant {
-                FieldControl(spec: discriminant, value: $value.child("discriminant"))
                 let picked = value["discriminant"]?.string ?? ""
-                if let sub = spec.values?.first(where: { $0.key == picked }) {
+                // A choice with nothing under it (Keystatic's empty field) shows nothing.
+                let sub = spec.values?.first { $0.key == picked && $0.type != "empty" }
+                // A small control sits on the menu's line; anything bigger goes under it.
+                if let sub, ["select", "checkbox", "integer"].contains(sub.type) {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(sub.title).foregroundStyle(.secondary)
-                        FieldControl(spec: sub, value: $value.child("value"))
+                        FieldControl(spec: discriminant, value: menu)
+                        subField(sub)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        FieldControl(spec: discriminant, value: menu)
+                        if let sub { subField(sub) }
                     }
                 }
             }
         }
         .environment(\.fieldPath, nil)
+    }
+
+    private func subField(_ sub: FieldSpec) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(sub.title).foregroundStyle(.secondary)
+            FieldControl(spec: sub, value: $value.child("value"))
+        }
+    }
+
+    /// The menu's choice. A new choice starts its fields fresh, as Keystatic
+    /// does, so a value from the old choice can't stay behind under it.
+    private var menu: Binding<FieldValue> {
+        Binding(
+            get: { value["discriminant"] ?? .null },
+            set: { picked in
+                guard picked != value["discriminant"] else { return }
+                value["discriminant"] = picked
+                let sub = spec.values?.first { $0.key == picked.string }
+                value["value"] = sub.map(Defaults.value(for:)) ?? .null
+            }
+        )
     }
 }
 
