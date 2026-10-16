@@ -57,12 +57,16 @@ cd canteiro
 ## Limits
 
 - **Keystatic only.** A site described only by Astro's own collection schemas won't open.
-- **R2 only** for photos dropped into the body. Image fields save into the repo instead.
+- **R2 only** for photos and audio, for now (see the [roadmap](#roadmap)). Image fields save into the repo instead.
 - **One site and one person at a time.** No accounts, sharing or locking.
 - **Mac only.** The inbox is the way to write on a phone.
 - **Some fields are shown but not edited:** Keystatic's `document` and other rich-content fields, and image and file fields inside a list.
 
 Canteiro sends nothing anywhere except your files to your own R2 bucket and your commits to your own git remote. No analytics, no crash reports, no account.
+
+## Roadmap
+
+- **Other storage services.** Uploads go only to Cloudflare R2 today. Support for other S3-compatible services, such as Amazon S3 or Backblaze B2, is on the way.
 
 ## More
 
