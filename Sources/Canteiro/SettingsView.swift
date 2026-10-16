@@ -146,7 +146,7 @@ private struct GeneralSettings: View {
         if let problem = store.configProblem {
             Status(ok: false, text: problem)
         } else if !FileManager.default.fileExists(atPath: site.appending(path: SiteConfig.fileName).path) {
-            Status(ok: nil, text: "None, so the inbox, uploads and MP3 drops are off. The README shows what goes in it.")
+            Status(ok: nil, text: "None, so the inbox, uploads and MP3 drops are off. The canteiro.json page in the docs shows what goes in it.")
         } else {
             let config = store.config
             let parts = [config.inbox.map { _ in "inbox" }, config.uploads.map { _ in "uploads" },
