@@ -4,6 +4,7 @@ What changed in each version of Canteiro, newest first. Downloads are on [Releas
 
 ## Unreleased
 
+- The New Aside window's cursor lines up with the hint and starts in the right font, and its language menu no longer opens blank while the site is loading.
 - An inbox folder in `canteiro.json` can be relative to the site, such as `inbox`.
 - A demo site in `demo/` to try Canteiro on, with posts, asides, a podcast, pages and an inbox.
 - File › Open Recent lists the sites you've opened, with ⌘1 to ⌘9 on the first ones. Switching back to a site lands on the section and entries you left it at. The inbox folder chosen with Choose Folder… now belongs to one site, and the preview server Canteiro started stops when you switch.

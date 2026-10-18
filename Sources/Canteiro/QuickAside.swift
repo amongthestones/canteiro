@@ -9,7 +9,6 @@ struct QuickAsideView: View {
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var text = ""
     @State private var language = ""
-    @FocusState private var focused: Bool
 
     private var item: SchemaItem? { store.streamItem }
     private var limit: Int { item?.textField?.maxLength ?? 280 }
@@ -23,23 +22,21 @@ struct QuickAsideView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            TextEditor(text: $text)
-                .font(.system(size: 15))
-                .scrollContentBackground(.hidden)
+            AsideTextView(text: $text)
+                .overlay(alignment: .topLeading) {
+                    if text.isEmpty {
+                        Text("One thought, \(limit) characters at most.")
+                            .font(.system(size: AsideTextView.fontSize))
+                            .foregroundStyle(.tertiary)
+                            // Room for the caret, so it doesn't cut the first letter.
+                            .padding(.leading, 3)
+                            .allowsHitTesting(false)
+                    }
+                }
                 .padding(8)
                 .background(.background, in: RoundedRectangle(cornerRadius: 10))
                 .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator))
                 .frame(height: 120)
-                .focused($focused)
-                .overlay(alignment: .topLeading) {
-                    if text.isEmpty {
-                        Text("One thought, \(limit) characters at most.")
-                            .foregroundStyle(.tertiary)
-                            .padding(.horizontal, 13)
-                            .padding(.vertical, 8)
-                            .allowsHitTesting(false)
-                    }
-                }
             HStack(spacing: 10) {
                 if let field = languageField, let options = field.options {
                     Picker("Language", selection: $language) {
@@ -65,10 +62,11 @@ struct QuickAsideView: View {
         }
         .padding(16)
         .frame(width: 460)
-        .onAppear {
-            text = ""
-            language = languageField?.defaultString ?? languageField?.options?.first?.value ?? ""
-            focused = true
+        .onAppear { text = "" }
+        // The site may still be loading when the window opens.
+        .onChange(of: languageField?.key, initial: true) {
+            guard let field = languageField, field.options?.contains(where: { $0.value == language }) != true else { return }
+            language = field.defaultString ?? field.options?.first?.value ?? ""
         }
     }
 
@@ -84,6 +82,55 @@ struct QuickAsideView: View {
     private func close() {
         text = ""
         dismissWindow(id: "aside")
+    }
+}
+
+/// The aside's text box. SwiftUI's TextEditor starts its caret in the
+/// default font and inset, so it sat off from the hint and jumped on the
+/// first letter. Here the empty view already types in the right font, with
+/// no inset, so the caret lines up with the hint.
+struct AsideTextView: NSViewRepresentable {
+    static let fontSize: CGFloat = 15
+    @Binding var text: String
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSTextView.scrollableTextView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        let view = scroll.documentView as! NSTextView
+        let font = NSFont.systemFont(ofSize: Self.fontSize)
+        view.isRichText = false
+        view.allowsUndo = true
+        view.drawsBackground = false
+        view.textContainerInset = .zero
+        view.textContainer?.lineFragmentPadding = 0
+        view.font = font
+        view.typingAttributes = [.font: font, .foregroundColor: NSColor.textColor]
+        view.string = text
+        view.delegate = context.coordinator
+        // The window isn't on screen yet; take the keyboard once it is.
+        DispatchQueue.main.async { view.window?.makeFirstResponder(view) }
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        context.coordinator.parent = self
+        guard let view = scroll.documentView as? NSTextView, view.string != text else { return }
+        view.string = text
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    @MainActor
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: AsideTextView
+        init(_ parent: AsideTextView) { self.parent = parent }
+
+        func textDidChange(_ notification: Notification) {
+            guard let view = notification.object as? NSTextView else { return }
+            parent.text = view.string
+        }
     }
 }
 
