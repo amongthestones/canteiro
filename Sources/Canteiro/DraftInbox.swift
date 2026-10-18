@@ -65,7 +65,7 @@ final class DraftInbox {
             defaults.removeObject(forKey: Self.oldFolderKey)
         }
         let chosen = site.flatMap { defaults.string(forKey: Self.folderKey($0)) }.map { URL(filePath: $0, directoryHint: .isDirectory) }
-        let next = config.inboxFolder.map { chosen ?? $0 }
+        let next = config.inboxFolder(site: site).map { chosen ?? $0 }
         collection = config.inbox?.importInto
         app = config.inbox?.app ?? "the writing app"
         guard next != folder else { return }

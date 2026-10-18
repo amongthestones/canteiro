@@ -1,0 +1,20 @@
+---
+const { title } = Astro.props;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>{title}</title>
+    <style is:global>
+      body { max-width: 36rem; margin: 3rem auto; padding: 0 1rem; font: 18px/1.6 Georgia, serif; color: #222; background: #fbf8f1; }
+      a { color: #3b5d2e; }
+      .draft { display: inline-block; padding: 0 0.5em; background: #f2c14e; border-radius: 3px; font: 600 13px system-ui; }
+      .date { color: #777; }
+    </style>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

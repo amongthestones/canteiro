@@ -37,7 +37,7 @@ A full example:
 
 | Key | Required | Meaning |
 |---|---|---|
-| `folder` | yes | The folder to watch. `~` is your home folder. The example is iA Writer's iCloud folder. |
+| `folder` | yes | The folder to watch. `~` is your home folder, and a relative path (`inbox`) is inside the site. The example is iA Writer's iCloud folder. |
 | `importInto` | yes | The key of the collection drafts become entries of. |
 | `app` | no | The writing app's name, used in the window's wording ("This draft changed in iA Writer…"). |
 

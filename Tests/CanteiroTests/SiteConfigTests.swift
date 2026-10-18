@@ -32,6 +32,7 @@ import Testing
     @Test func readsTheFile() throws {
         let config = try SiteConfig.load(site: site(json))
         #expect(config.inboxFolder?.path == NSString(string: "~/Drafts/Blog").expandingTildeInPath)
+        #expect(config.inboxFolder(site: URL(fileURLWithPath: "/Sites/a"))?.path == NSString(string: "~/Drafts/Blog").expandingTildeInPath)
         #expect(config.inbox?.app == "iA Writer")
         #expect(config.isEpisodes("episodes-myshow"))
         #expect(!config.isEpisodes("posts"))
@@ -41,6 +42,12 @@ import Testing
         #expect(config.publicURL(for: "img/2026/x.webp") == "https://media.example.com/img/2026/x.webp")
         #expect(config.extras == [.highlight, .toc])
         #expect(config.audioField == "audioUrl", "field names fall back to the usual ones")
+    }
+
+    /// A relative inbox folder is inside the site, wherever the site is.
+    @Test func aRelativeInboxIsInTheSite() throws {
+        let config = try SiteConfig.load(site: site(#"{"inbox": {"folder": "inbox", "importInto": "posts"}}"#))
+        #expect(config.inboxFolder(site: URL(fileURLWithPath: "/Sites/demo"))?.path == "/Sites/demo/inbox")
     }
 
     @Test func aBrokenFileSaysWhere() throws {

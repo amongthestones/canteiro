@@ -99,8 +99,14 @@ struct SiteConfig: Codable, Sendable, Equatable {
 
     var extras: Set<Syntax> { syntax ?? [] }
 
-    var inboxFolder: URL? {
-        inbox.map { URL(filePath: NSString(string: $0.folder).expandingTildeInPath, directoryHint: .isDirectory) }
+    var inboxFolder: URL? { inboxFolder(site: nil) }
+
+    /// A relative folder (inbox/) is inside the site.
+    func inboxFolder(site: URL?) -> URL? {
+        guard let folder = inbox?.folder else { return nil }
+        let path = NSString(string: folder).expandingTildeInPath
+        if let site, !path.hasPrefix("/") { return site.appending(path: path, directoryHint: .isDirectory) }
+        return URL(filePath: path, directoryHint: .isDirectory)
     }
 
     func isEpisodes(_ key: String) -> Bool {

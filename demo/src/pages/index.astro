@@ -1,0 +1,15 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from '../Layout.astro';
+
+// Drafts show on the dev server, so Canteiro's Preview can open them.
+const posts = (await getCollection('posts', (p) => import.meta.env.DEV || !p.data.draft))
+  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+---
+
+<Layout title="Orchard Lane">
+  <h1>Orchard Lane</h1>
+  <ul>
+    {posts.map((p) => <li><a href={`/posts/${p.slug}/`}>{p.data.title}</a></li>)}
+  </ul>
+</Layout>

@@ -1,0 +1,18 @@
+{
+  "inbox": {
+    "folder": "inbox",
+    "importInto": "posts",
+    "app": "iA Writer"
+  },
+  "uploads": {
+    "bucket": "demo-media",
+    "publicBase": "https://media.example.com",
+    "photos": "uploads/{yyyy}/{mm}/",
+    "audio": "podcasts/{show}/"
+  },
+  "podcasts": {
+    "collections": ["episodes-*"],
+    "guid": "{show}-{number}"
+  },
+  "syntax": ["highlight", "inlineFootnotes", "callouts"]
+}

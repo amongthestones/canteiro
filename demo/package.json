@@ -1,0 +1,13 @@
+{
+  "name": "canteiro-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build"
+  },
+  "dependencies": {
+    "@keystatic/core": "^0.6.9",
+    "astro": "^4.16.0"
+  }
+}
