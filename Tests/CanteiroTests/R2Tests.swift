@@ -21,6 +21,17 @@ import Testing
         #expect(SigV4.encode("myshow-001.mp3") == "myshow-001.mp3")
     }
 
+    /// A taken name gets the first free -vN beside it; nothing is replaced.
+    @Test func takenKeysGetTheNextVersion() async throws {
+        let taken: Set<String> = ["audio/ep.mp3", "audio/ep-v2.mp3", "uploads/2026/10/a.b/photo.webp"]
+        let exists: (String) async throws -> Bool = { taken.contains($0) }
+        #expect(try await R2Client.freeKey(for: "audio/new.mp3", exists: exists) == "audio/new.mp3")
+        #expect(try await R2Client.freeKey(for: "audio/ep.mp3", exists: exists) == "audio/ep-v3.mp3")
+        // The dot in a folder name isn't the extension's.
+        #expect(try await R2Client.freeKey(for: "uploads/2026/10/a.b/photo.webp", exists: exists) == "uploads/2026/10/a.b/photo-v2.webp")
+        #expect(try await R2Client.freeKey(for: "audio/README", exists: { $0 == "audio/README" }) == "audio/README-v2")
+    }
+
     @Test func pastedKeysAreTrimmed() {
         #expect(R2Settings.trimmed("  \"abc123\"\n") == "abc123")
     }

@@ -397,10 +397,13 @@ final class SiteStore {
         var progress: Double = 0
     }
 
-    /// Puts a file in the site's bucket and returns its public address.
+    /// Puts a file in the site's bucket and returns its public address. If
+    /// the name is taken, the file goes up beside it as -v2, -v3…
     func upload(_ file: URL, key: String, contentType: String, name: String) async throws -> String {
-        guard let bucket = config.uploads?.bucket, let address = config.publicURL(for: key) else { throw UploadFailure.noUploads }
+        guard let bucket = config.uploads?.bucket else { throw UploadFailure.noUploads }
         let client = try R2Client.fromSettings(bucket: bucket)
+        let key = try await R2Client.freeKey(for: key, exists: client.exists)
+        guard let address = config.publicURL(for: key) else { throw UploadFailure.noUploads }
         let upload = Upload(name: name)
         uploads.append(upload)
         defer { uploads.removeAll { $0.id == upload.id } }

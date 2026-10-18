@@ -4,6 +4,7 @@ What changed in each version of Canteiro, newest first. Downloads are on [Releas
 
 ## Unreleased
 
+- An upload never replaces a file already on R2. If the name is taken, the new file goes up beside it as `-v2`, `-v3` and so on, so a feed can't end up listing a size that podcast apps don't get.
 - A Sort menu beside Filter: Last Edited, Date Added or Title, as well as each list's usual order. Each list remembers its choice, and the rows show the date it sorts by.
 - Image and file fields can be edited: choose, replace or remove a file, or drop one on the field. Images show a preview. The file is saved into the repo where Keystatic puts it, so either one can edit the entry.
 - Moving an entry to the Trash takes its images and files with it, as Keystatic does.

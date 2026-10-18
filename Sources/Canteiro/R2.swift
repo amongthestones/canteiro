@@ -144,7 +144,7 @@ struct R2Client: Sendable {
     func put(_ file: URL, key: String, contentType: String, progress: @escaping @Sendable (Double) -> Void) async throws {
         let data = try Data(contentsOf: file)
         let host = "\(accountID).r2.cloudflarestorage.com"
-        let path = "/" + bucket + "/" + key.split(separator: "/").map { SigV4.encode(String($0)) }.joined(separator: "/")
+        let path = Self.path(bucket: bucket, key: key)
         var request = URLRequest(url: URL(string: "https://\(host)\(path)")!)
         request.httpMethod = "PUT"
         let headers = ["host": host, "content-type": contentType, "content-length": String(data.count)]
@@ -160,6 +160,44 @@ struct R2Client: Sendable {
             throw Failure.rejected(code, String(decoding: body, as: UTF8.self))
         }
         progress(1)
+    }
+
+    /// Whether something is already at `key`. A HEAD request: no body comes back.
+    func exists(_ key: String) async throws -> Bool {
+        let host = "\(accountID).r2.cloudflarestorage.com"
+        let path = Self.path(bucket: bucket, key: key)
+        var request = URLRequest(url: URL(string: "https://\(host)\(path)")!)
+        request.httpMethod = "HEAD"
+        let signed = SigV4.sign(method: "HEAD", path: path, query: "", headers: ["host": host], payload: Data(),
+                                accessKeyID: accessKeyID, secret: secretAccessKey, region: "auto", date: .now)
+        for (name, value) in signed where name != "host" { request.setValue(value, forHTTPHeaderField: name) }
+        let (_, response) = try await URLSession.shared.data(for: request)
+        let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+        switch code {
+        case 200..<300: return true
+        case 404: return false
+        default: throw Failure.rejected(code, "Couldn't check whether \(key) is already up.")
+        }
+    }
+
+    /// `key` if nothing is there yet, else the first free -v2, -v3… beside it
+    /// (episode.mp3, episode-v2.mp3). A file already up is never replaced: the
+    /// media cache keeps the old one for a month, and a feed would then list a
+    /// size apps don't get.
+    static func freeKey(for key: String, exists: (String) async throws -> Bool) async throws -> String {
+        guard try await exists(key) else { return key }
+        let slash = key.lastIndex(of: "/").map { key.index(after: $0) } ?? key.startIndex
+        let dot = key[slash...].lastIndex(of: ".") ?? key.endIndex
+        let stem = key[..<dot], ext = key[dot...]
+        for n in 2...99 {
+            let next = "\(stem)-v\(n)\(ext)"
+            if try await !exists(next) { return next }
+        }
+        throw Failure.rejected(409, "\(key) and its versions up to -v99 are all taken.")
+    }
+
+    static func path(bucket: String, key: String) -> String {
+        "/" + bucket + "/" + key.split(separator: "/").map { SigV4.encode(String($0)) }.joined(separator: "/")
     }
 
     /// Lists one object: a cheap check that the account, bucket and keys work.
