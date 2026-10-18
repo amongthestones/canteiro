@@ -23,7 +23,7 @@ Three columns, like Mail.
 - **Sidebar:** your collections and singletons, grouped the way your Keystatic config's `ui.navigation` groups them, with a count beside each collection. Anything the navigation leaves out goes in a last "Other" group, so nothing is hidden. Problems reading the site (a file that doesn't parse, a broken `canteiro.json`) are listed at the bottom.
 - **List:** a collection's entries, newest first when it has a date field, else by its first number field. Drafts have an orange dot. Each row is the title, the date, and two lines of the text.
 - **Editor:** the entry's fields on top and the body below. Fields that are empty and optional fold under "More fields", so the top stays short. Singletons skip the list and open straight into their form.
-- **Toolbar:** New Entry, the list filter, search, Markdown or Rich, Publish (with a count of changed files) and Preview.
+- **Toolbar:** New Entry, the list filter and sort, search, Markdown or Rich, Publish (with a count of changed files) and Preview.
 
 ## Fields
 
@@ -80,6 +80,7 @@ The Format menu writes the marks for you, with iA Writer's shortcuts. Each one t
 - **New Entry (⌘N)** asks for a title, shows the address it will make, and creates the file with your config's defaults. If the collection has a `draft` checkbox, the new entry starts as a draft so a publish can't put it on the site half-written. In an aside collection, ⌘N opens the quick aside window instead; in a podcast collection, it asks for an MP3.
 - **Search** filters the list by title.
 - **Filter** shows drafts or published entries, or the entries with a given choice in any select field.
+- **Sort** puts the list in its usual order (by date, order number or title), by Last Edited or Date Added (the file's own dates, newest first), or by title. Each list keeps its choice. Sorted by a file date, each row shows that date.
 - **Move to Trash** (Delete, or right-click) moves the file to the Finder's Trash, so a slip can be put back from there, or from git until it's published.
 
 ## Quick asides

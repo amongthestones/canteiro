@@ -51,7 +51,7 @@ Keystatic's `itemLabel` functions can't be read from the config, so lists use th
 | `PhotoProcessor.swift`, `R2.swift` | Photos, R2 and the keychain |
 | `PreviewServer.swift`, `PreviewPane.swift` | `astro dev` and the preview window |
 | `Git.swift`, `PublishSheet.swift` | Changes, diffs, commit and push |
-| `ListFilter.swift`, `NewEntry.swift` | The list filter and new entries |
+| `ListFilter.swift`, `ListSort.swift`, `NewEntry.swift` | The list filter, the list order and new entries |
 | `Subprocess.swift` | Running Node, git and `cwebp` |
 
 ## The icon

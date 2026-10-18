@@ -9,9 +9,16 @@ struct CollectionView: View {
     @AppStorage("listWidth") private var listWidth = 320.0
     @State private var dropTargeted = false
     @State private var filter = ListFilter()
+    /// Kept per collection between launches.
+    @AppStorage private var sort: ListSort
+
+    init(item: SchemaItem) {
+        self.item = item
+        _sort = AppStorage(wrappedValue: .standard, "sort.\(item.key)")
+    }
 
     private var entries: [Entry] {
-        let all = (store.entries[item.key] ?? []).filter(filter.matches)
+        let all = sort.apply((store.entries[item.key] ?? []).filter(filter.matches), item: item)
         guard !search.isEmpty else { return all }
         return all.filter { SiteStore.title(of: $0, item: item).localizedCaseInsensitiveContains(search) }
     }
@@ -26,7 +33,7 @@ struct CollectionView: View {
                     EpisodeDropHint(targeted: dropTargeted)
                 }
                 ForEach(entries) { entry in
-                    EntryRow(entry: entry, item: item).tag(entry.id)
+                    EntryRow(entry: entry, item: item, fileDate: sort.fileDate(entry)).tag(entry.id)
                 }
             }
             .contextMenu(forSelectionType: Entry.ID.self) { ids in
@@ -73,6 +80,7 @@ struct CollectionView: View {
             if ListFilterMenu.applies(to: item) {
                 ToolbarItem(placement: .navigation) { ListFilterMenu(item: item, filter: $filter) }
             }
+            ToolbarItem(placement: .navigation) { ListSortMenu(item: item, sort: $sort) }
         }
         .searchable(text: $search, placement: .toolbar, prompt: "Search \(item.label)")
         .onAppear {
@@ -106,11 +114,13 @@ struct EpisodeDropHint: View {
 struct EntryRow: View {
     let entry: Entry
     let item: SchemaItem
+    /// When the list is sorted by a file date, the row shows that date.
+    var fileDate: Date? = nil
 
     private var isDraft: Bool { entry.data["draft"]?.bool == true }
 
     private var dateText: String? {
-        guard let field = item.dateField, let date = entry.data[field.key]?.date else { return nil }
+        guard let date = fileDate ?? item.dateField.flatMap({ entry.data[$0.key]?.date }) else { return nil }
         let thisYear = Calendar.current.isDate(date, equalTo: .now, toGranularity: .year)
         return date.formatted(thisYear ? .dateTime.month(.abbreviated).day() : .dateTime.month(.abbreviated).day().year())
     }

@@ -4,6 +4,7 @@ What changed in each version of Canteiro, newest first. Downloads are on [Releas
 
 ## Unreleased
 
+- A Sort menu beside Filter: Last Edited, Date Added or Title, as well as each list's usual order. Each list remembers its choice, and the rows show the date it sorts by.
 - Image and file fields can be edited: choose, replace or remove a file, or drop one on the field. Images show a preview. The file is saved into the repo where Keystatic puts it, so either one can edit the entry.
 - Moving an entry to the Trash takes its images and files with it, as Keystatic does.
 - Settings has a General tab that checks the open site, its `keystatic.config.ts` and `canteiro.json`, where Publish pushes, the inbox folder, and the tools Canteiro runs (Node, git, cwebp, the site's packages), with a fix for anything missing.
