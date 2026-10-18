@@ -4,6 +4,7 @@ What changed in each version of Canteiro, newest first. Downloads are on [Releas
 
 ## Unreleased
 
+- File › Open Recent lists the sites you've opened, with ⌘1 to ⌘9 on the first ones. Switching back to a site lands on the section and entries you left it at. The inbox folder chosen with Choose Folder… now belongs to one site, and the preview server Canteiro started stops when you switch.
 - An upload never replaces a file already on R2. If the name is taken, the new file goes up beside it as `-v2`, `-v3` and so on, so a feed can't end up listing a size that podcast apps don't get.
 - A Sort menu beside Filter: Last Edited, Date Added or Title, as well as each list's usual order. Each list remembers its choice, and the rows show the date it sorts by.
 - Image and file fields can be edited: choose, replace or remove a file, or drop one on the field. Images show a preview. The file is saved into the repo where Keystatic puts it, so either one can edit the entry.

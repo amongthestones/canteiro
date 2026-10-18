@@ -43,12 +43,70 @@ final class SiteStore {
     /// Bumped when an entry is reread from disk, so its editor starts over.
     private(set) var revisions: [Entry.ID: Int] = [:]
 
-    var selectedItem: String?
+    var selectedItem: String? {
+        didSet { rememberPlace() }
+    }
     /// The collection a New Entry sheet is open for.
     var newEntryItem: SchemaItem?
-    var selectedEntry: [String: Entry.ID] = [:]
+    var selectedEntry: [String: Entry.ID] = [:] {
+        didSet { rememberPlace() }
+    }
 
     private static let siteKey = "sitePath"
+    private static let recentKey = "recentSites"
+    /// How many sites File › Open Recent lists.
+    nonisolated static let recentLimit = 8
+
+    /// Sites opened before, newest first, for File › Open Recent. Ones whose
+    /// folder has gone are left out.
+    private(set) var recentSites: [URL] = (UserDefaults.standard.stringArray(forKey: recentKey) ?? [])
+        .map { URL(fileURLWithPath: $0) }
+        .filter { SiteStore.isSite($0) }
+
+    nonisolated static func recents(_ list: [String], opening path: String) -> [String] {
+        Array(([path] + list.filter { $0 != path }).prefix(recentLimit))
+    }
+
+    /// A recent site's name in the menu: its folder, plus the folder above
+    /// when two share a name.
+    func menuName(_ url: URL) -> String {
+        let name = url.lastPathComponent
+        let twins = recentSites.filter { $0.lastPathComponent == name }.count > 1
+        return twins ? "\(name) (\(url.deletingLastPathComponent().lastPathComponent))" : name
+    }
+
+    func clearRecents() {
+        recentSites = siteURL.map { [$0] } ?? []
+        UserDefaults.standard.set(recentSites.map(\.path), forKey: Self.recentKey)
+    }
+
+    // MARK: Where you were, per site
+
+    private struct Place: Codable {
+        var item: String?
+        var entries: [String: Entry.ID]
+    }
+
+    nonisolated static func placeKey(_ site: URL) -> String { "place." + site.path }
+
+    /// Saves the sidebar item and each list's entry for this site, so coming
+    /// back to it lands in the same place. Not while a site is loading, when
+    /// the selection is being reset.
+    private func rememberPlace() {
+        guard let siteURL, phase == .ready,
+              let data = try? JSONEncoder().encode(Place(item: selectedItem, entries: selectedEntry)) else { return }
+        UserDefaults.standard.set(data, forKey: Self.placeKey(siteURL))
+    }
+
+    private func restorePlace(_ site: URL, schema: SiteSchema) {
+        let saved = UserDefaults.standard.data(forKey: Self.placeKey(site)).flatMap { try? JSONDecoder().decode(Place.self, from: $0) }
+        selectedEntry = (saved?.entries ?? [:]).filter { key, id in entries[key]?.contains { $0.id == id } == true }
+        if let item = saved?.item, item == DraftInbox.sidebarKey || schema.item(item) != nil {
+            selectedItem = item
+        } else {
+            selectedItem = schema.groups.first?.items.first?.key
+        }
+    }
 
     var siteName: String { siteURL?.lastPathComponent ?? "Canteiro" }
 
@@ -57,6 +115,15 @@ final class SiteStore {
         guard let saved = UserDefaults.standard.string(forKey: Self.siteKey),
               Self.isSite(URL(fileURLWithPath: saved)) else { return }
         await open(URL(fileURLWithPath: saved))
+    }
+
+    func openRecent(_ url: URL) {
+        guard url != siteURL else { return }
+        guard Self.isSite(url) else {
+            phase = .failed("\(url.lastPathComponent) has no keystatic.config.ts any more.")
+            return
+        }
+        Task { await open(url) }
     }
 
     func chooseSite() {
@@ -83,9 +150,28 @@ final class SiteStore {
     }
 
     func open(_ url: URL) async {
+        let switching = url != siteURL
         phase = .loading
+        if switching {
+            // Nothing from the last site carries over: entry ids are paths,
+            // and two sites can share them.
+            selectedItem = nil
+            selectedEntry = [:]
+            newEntryItem = nil
+            conflicts = []
+            saveErrors = [:]
+            revisions = [:]
+            changes = []
+            lastError = nil
+            // Clearing it first means the inbox always hears of the new
+            // site's config, even one the same as the last site's.
+            config = SiteConfig()
+        }
         siteURL = url
         UserDefaults.standard.set(url.path, forKey: Self.siteKey)
+        let paths = Self.recents(recentSites.map(\.path), opening: url.path)
+        UserDefaults.standard.set(paths, forKey: Self.recentKey)
+        recentSites = paths.map { URL(fileURLWithPath: $0) }
         do {
             let schema = try await SchemaLoader.load(site: url)
             let loaded = await Task.detached(priority: .userInitiated) { Self.readAll(schema, site: url) }.value
@@ -102,10 +188,13 @@ final class SiteStore {
                 problems.insert(error.localizedDescription, at: 0)
             }
             refreshChanges()
-            if selectedItem == nil || schema.item(selectedItem!) == nil {
+            if switching {
+                restorePlace(url, schema: schema)
+            } else if selectedItem == nil || (selectedItem != DraftInbox.sidebarKey && schema.item(selectedItem!) == nil) {
                 selectedItem = schema.groups.first?.items.first?.key
             }
             phase = .ready
+            rememberPlace()
         } catch {
             phase = .failed(error.localizedDescription)
         }

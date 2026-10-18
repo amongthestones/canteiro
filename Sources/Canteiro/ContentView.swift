@@ -60,7 +60,7 @@ struct ContentView: View {
             NSApp.activate()
             openWindow(id: "aside")
         }
-        .onChange(of: store.config, initial: true) { inbox.configure(store.config) }
+        .onChange(of: store.config, initial: true) { inbox.configure(store.config, site: store.siteURL) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Catch commits and edits made outside the app.
             store.refreshChanges()

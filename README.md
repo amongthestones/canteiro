@@ -38,7 +38,7 @@ cd canteiro
 
 ## First run
 
-1. **Open your site:** File › Open Site… (⌘O), and choose the folder with `keystatic.config.ts`. If the config can't be read, the window says why: usually Node wasn't found or `node_modules` is missing.
+1. **Open your site:** File › Open Site… (⌘O), and choose the folder with `keystatic.config.ts`. File › Open Recent switches between sites you've opened, and each one comes back where you left it. If the config can't be read, the window says why: usually Node wasn't found or `node_modules` is missing.
 2. **Add a `canteiro.json`** to the site's repo if you want uploads, MP3 import, the inbox or your site's own markdown extras. Every part is optional:
 
    ```json

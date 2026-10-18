@@ -28,6 +28,7 @@ final class PreviewServer {
     /// Looks for a dev server already serving this site.
     func find(for site: URL) {
         guard site != self.site || state == .idle || state == .off else { return }
+        if site != self.site { stop() }
         self.site = site
         state = .looking
         Task {

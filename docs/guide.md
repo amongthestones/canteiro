@@ -99,7 +99,7 @@ Drop a photo (JPEG, PNG, HEIC and the rest) into the body. Before anything leave
 1. it's turned upright and resized to 1400 pixels wide, never wider than the original,
 2. converted to WebP at quality 75,
 3. stripped of all metadata, GPS location included,
-4. uploaded to your bucket, in the photo folder from `canteiro.json` (by default `uploads/YYYY/MM/`), under a web-safe version of its file name.
+4. uploaded to your bucket, in the photo folder from `canteiro.json` (by default `uploads/YYYY/MM/`), under a web-safe version of its file name. If a file by that name is already in the bucket, the new one goes up beside it as `-v2`, `-v3` and so on. Canteiro never replaces a file that's already up.
 
 A placeholder marks the spot while it works, then becomes `![](https://your.public.address/uploads/2026/10/name.webp)`. Add alt text between the brackets. A progress bar shows each upload, and errors appear in the same bar.
 
@@ -125,7 +125,7 @@ If `canteiro.json` has an `inbox`, a sidebar section lists the drafts in that fo
 - **The title** comes from the draft's frontmatter `title`, else a `# heading` on its first line (taken out of the body, since your site shows the title), else the file name.
 - **Frontmatter** in the draft is carried over for keys that match the collection's fields. Anything else stays in the draft. A tag that isn't in your site's tag list can still break the site's deploy, even on a draft.
 
-Plain `.md`, `.markdown` and `.txt` files are listed. Folders and hidden files are skipped. Choose Folder… sets a different folder on this Mac only, over the one in `canteiro.json`.
+Plain `.md`, `.markdown` and `.txt` files are listed. Folders and hidden files are skipped. Choose Folder… sets a different folder on this Mac only, over the one in `canteiro.json`. Each site keeps its own.
 
 ## Preview
 
@@ -163,6 +163,7 @@ The bucket and public address belong to the site and come from its `canteiro.jso
 | ⌘R | Switch between Markdown and Rich |
 | ⌥⌘P | Show or hide Preview |
 | ⌘O | Open a site |
+| ⌘1 to ⌘9 | Open a recent site (File › Open Recent) |
 | ⇧⌘R | Reload the site (rereads the config, the files and `canteiro.json`) |
 | ⌘, | Settings |
 | Delete | Move the selected entry to the Trash |

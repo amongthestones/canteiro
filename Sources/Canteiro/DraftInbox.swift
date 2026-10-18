@@ -21,8 +21,11 @@ struct InboxDraft: Identifiable, Hashable {
 final class DraftInbox {
     /// The sidebar's tag for the inbox. Schema keys never have a dot.
     static let sidebarKey = "canteiro.inbox"
-    /// A folder chosen on this Mac, over the site's.
-    private static let folderKey = "inboxPath"
+    /// A folder chosen on this Mac, over the site's. One per site.
+    nonisolated static func folderKey(_ site: URL) -> String { "inboxPath." + site.path }
+    /// Where 0.1 kept one folder for every site.
+    private static let oldFolderKey = "inboxPath"
+    private var site: URL?
 
     private(set) var drafts: [InboxDraft] = []
     var selected: URL?
@@ -52,8 +55,16 @@ final class DraftInbox {
     }
 
     /// Follows the open site: its inbox, or none.
-    func configure(_ config: SiteConfig) {
-        let chosen = UserDefaults.standard.string(forKey: Self.folderKey).map { URL(filePath: $0, directoryHint: .isDirectory) }
+    func configure(_ config: SiteConfig, site: URL?) {
+        self.site = site
+        let defaults = UserDefaults.standard
+        // A folder chosen before folders were per site goes to the first site
+        // with an inbox, which was the only one using it.
+        if let site, config.inboxFolder != nil, let old = defaults.string(forKey: Self.oldFolderKey) {
+            defaults.set(old, forKey: Self.folderKey(site))
+            defaults.removeObject(forKey: Self.oldFolderKey)
+        }
+        let chosen = site.flatMap { defaults.string(forKey: Self.folderKey($0)) }.map { URL(filePath: $0, directoryHint: .isDirectory) }
         let next = config.inboxFolder.map { chosen ?? $0 }
         collection = config.inbox?.importInto
         app = config.inbox?.app ?? "the writing app"
@@ -71,9 +82,9 @@ final class DraftInbox {
         panel.directoryURL = folder
         panel.prompt = "Watch"
         panel.message = "Choose the folder in \(app) your drafts go in."
-        guard panel.runModal() == .OK, let url = panel.url, folder != nil else { return }
+        guard panel.runModal() == .OK, let url = panel.url, folder != nil, let site else { return }
         folder = url
-        UserDefaults.standard.set(url.path, forKey: Self.folderKey)
+        UserDefaults.standard.set(url.path, forKey: Self.folderKey(site))
         refresh()
         watch()
     }

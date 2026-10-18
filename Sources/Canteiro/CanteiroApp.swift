@@ -60,6 +60,19 @@ struct CanteiroApp: App {
                 Divider()
                 Button("Open Site…") { store.chooseSite() }
                     .keyboardShortcut("o")
+                Menu("Open Recent") {
+                    ForEach(Array(store.recentSites.enumerated()), id: \.element) { index, url in
+                        let button = Button(store.menuName(url)) { store.openRecent(url) }
+                        if index < 9 {
+                            button.keyboardShortcut(KeyEquivalent(Character(String(index + 1))))
+                        } else {
+                            button
+                        }
+                    }
+                    Divider()
+                    Button("Clear Menu") { store.clearRecents() }
+                        .disabled(store.recentSites.count <= 1)
+                }
                 Button("Reload Site") { store.reload() }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                     .disabled(store.siteURL == nil)

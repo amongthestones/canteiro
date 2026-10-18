@@ -82,3 +82,21 @@ import Testing
         }
     }
 }
+
+@Suite struct RecentSitesTests {
+    /// Opening a site moves it to the top, once, and the list stays short.
+    @Test func newestFirstWithoutRepeats() {
+        #expect(SiteStore.recents([], opening: "/a") == ["/a"])
+        #expect(SiteStore.recents(["/a", "/b", "/c"], opening: "/c") == ["/c", "/a", "/b"])
+        let full = (1...SiteStore.recentLimit).map { "/\($0)" }
+        let next = SiteStore.recents(full, opening: "/new")
+        #expect(next.count == SiteStore.recentLimit && next.first == "/new" && !next.contains(full.last!))
+    }
+
+    /// Where you were and the inbox folder are kept per site, by its path.
+    @Test func perSiteKeys() {
+        let a = URL(fileURLWithPath: "/Sites/a"), b = URL(fileURLWithPath: "/Sites/b")
+        #expect(SiteStore.placeKey(a) != SiteStore.placeKey(b))
+        #expect(DraftInbox.folderKey(a) == "inboxPath./Sites/a")
+    }
+}
