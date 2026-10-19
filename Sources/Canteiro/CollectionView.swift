@@ -119,6 +119,18 @@ struct EntryRow: View {
 
     private var isDraft: Bool { entry.data["draft"]?.bool == true }
 
+    /// One height for every row: the title line plus two subtitle lines, from
+    /// the fonts themselves. The list measures a row once and keeps that height,
+    /// so a row added while its text was short stayed short; a fixed height
+    /// can't be measured wrong.
+    static let height: CGFloat = {
+        func line(_ style: NSFont.TextStyle) -> CGFloat {
+            let font = NSFont.preferredFont(forTextStyle: style)
+            return ceil(font.ascender - font.descender + font.leading)
+        }
+        return line(.body) + 2 + 2 * line(.callout)
+    }()
+
     private var dateText: String? {
         guard let date = fileDate ?? item.dateField.flatMap({ entry.data[$0.key]?.date }) else { return nil }
         let thisYear = Calendar.current.isDate(date, equalTo: .now, toGranularity: .year)
@@ -161,6 +173,7 @@ struct EntryRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2, reservesSpace: true)
             }
+            .frame(height: Self.height, alignment: .top)
         }
         .padding(.vertical, 3)
     }
