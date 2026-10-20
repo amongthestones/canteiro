@@ -1,22 +1,22 @@
 import AppKit
 
-/// How the entry is shown. Markdown and Rich edit the same text; Rich only
+/// How the entry is shown. Markdown and Read edit the same text; Read only
 /// draws it differently, so the file on disk is exactly what was typed
 /// either way.
 enum BodyMode: String {
-    case markdown, rich
+    case markdown, read
 }
 
 /// Styles the body's markdown in place. Markdown: a mono font with the marks
-/// faded, as iA Writer does. Rich: a reading font with the marks hidden and
+/// faded, as iA Writer does. Read: a reading font with the marks hidden and
 /// the result shown. A site's own syntax, from its canteiro.json, comes on
 /// top: ==highlights==, [^inline footnotes], ^^^callouts^^^ and {{TOC}}.
 enum MarkdownStyler {
-    static func style(_ storage: NSTextStorage, mode: BodyMode, syntax: Set<SiteConfig.Syntax> = [], look: RichLook = .standard,
+    static func style(_ storage: NSTextStorage, mode: BodyMode, syntax: Set<SiteConfig.Syntax> = [], look: ReadLook = .standard,
                       images: [String: NSSize] = [:]) {
         let text = storage.string as NSString
         let all = NSRange(location: 0, length: text.length)
-        let rich = mode == .rich
+        let read = mode == .read
         let base = baseFont(mode, look)
 
         storage.beginEditing()
@@ -28,7 +28,7 @@ enum MarkdownStyler {
         }
         func mark(_ range: NSRange) {
             guard range.location != NSNotFound, range.length > 0 else { return }
-            if rich {
+            if read {
                 // Tiny enough that a long hidden URL leaves no gap.
                 storage.addAttributes([.font: NSFont.systemFont(ofSize: 0.01), .foregroundColor: NSColor.clear], range: range)
             } else {
@@ -45,9 +45,9 @@ enum MarkdownStyler {
         // Headings: # to ######.
         each(#"^(#{1,6})([ \t]+)(.+)$"#) { m in
             let level = m.range(at: 1).length
-            let font = rich ? look.headingFont(level: level) : NSFont.monospacedSystemFont(ofSize: 14, weight: .bold)
+            let font = read ? look.headingFont(level: level) : NSFont.monospacedSystemFont(ofSize: 14, weight: .bold)
             storage.addAttribute(.font, value: font, range: m.range(at: 3))
-            if rich {
+            if read {
                 storage.addAttribute(.foregroundColor, value: look.headings, range: m.range(at: 3))
                 // A heading takes its own font's height, not the body's.
                 if look.lineHeight != nil {
@@ -79,16 +79,16 @@ enum MarkdownStyler {
         }
         // `code`
         each(#"`([^`\n]+)`"#) { m in
-            storage.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: rich ? 13.5 : 14, weight: .regular), range: m.range(at: 1))
-            if rich { storage.addAttribute(.backgroundColor, value: NSColor.quaternaryLabelColor, range: m.range(at: 1)) }
+            storage.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: read ? 13.5 : 14, weight: .regular), range: m.range(at: 1))
+            if read { storage.addAttribute(.backgroundColor, value: NSColor.quaternaryLabelColor, range: m.range(at: 1)) }
             mark(NSRange(location: m.range.location, length: 1))
             mark(NSRange(location: NSMaxRange(m.range) - 1, length: 1))
         }
-        // [^an inline footnote], iA Writer's kind: small and raised in Rich.
+        // [^an inline footnote], iA Writer's kind: small and raised in Read.
         if syntax.contains(.inlineFootnotes) {
             each(#"\[\^([^\]]+)\]"#) { m in
                 storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: m.range(at: 1))
-                if rich {
+                if read {
                     storage.addAttributes([.font: NSFont.systemFont(ofSize: 11), .baselineOffset: 5], range: m.range(at: 1))
                 }
                 mark(NSRange(location: m.range.location, length: 2))
@@ -97,19 +97,19 @@ enum MarkdownStyler {
         }
         // [links](url "title"), not images.
         each(#"(?<!!)\[([^\]\n]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)"#) { m in
-            storage.addAttribute(.foregroundColor, value: rich ? look.links : NSColor.linkColor, range: m.range(at: 1))
-            if rich { storage.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: m.range(at: 1)) }
+            storage.addAttribute(.foregroundColor, value: read ? look.links : NSColor.linkColor, range: m.range(at: 1))
+            if read { storage.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: m.range(at: 1)) }
             mark(NSRange(location: m.range.location, length: 1))
             mark(NSRange(location: NSMaxRange(m.range(at: 1)), length: NSMaxRange(m.range) - NSMaxRange(m.range(at: 1))))
         }
-        // ![images](url "caption"): kept visible, set back. In Rich, a photo
+        // ![images](url "caption"): kept visible, set back. In Read, a photo
         // on a line of its own that has loaded takes the line's place: the
         // line is hidden, and gets room above it where BodyNSTextView draws
         // the photo. TextKit leaves out the space before a document's first
         // paragraph, so a photo there makes its line tall instead.
         each(imagePattern) { m in
             storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: m.range)
-            guard rich else { return }
+            guard read else { return }
             storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 12), range: m.range)
             let line = text.lineRange(for: m.range)
             guard let size = images[text.substring(with: m.range(at: 1))],
@@ -129,7 +129,7 @@ enum MarkdownStyler {
         // ^^^callouts^^^, one line or fenced.
         if syntax.contains(.callouts) {
             each(#"\^\^\^([\s\S]*?)\^\^\^"#, []) { m in
-                if rich { storage.addAttribute(.backgroundColor, value: NSColor.quaternaryLabelColor.withAlphaComponent(0.12), range: m.range(at: 1)) }
+                if read { storage.addAttribute(.backgroundColor, value: NSColor.quaternaryLabelColor.withAlphaComponent(0.12), range: m.range(at: 1)) }
                 mark(NSRange(location: m.range.location, length: 3))
                 mark(NSRange(location: NSMaxRange(m.range) - 3, length: 3))
             }
@@ -137,7 +137,7 @@ enum MarkdownStyler {
         // > quotes, list markers, rules and {{TOC}}: faded in both views.
         each(#"^(>[ \t]?)(.*)$"#) { m in
             storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: m.range(at: 1))
-            if rich { storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: m.range(at: 2)) }
+            if read { storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: m.range(at: 2)) }
         }
         each(#"^[ \t]*([-*+]|\d+\.)[ \t]"#) { m in
             storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: m.range(at: 1))
@@ -239,12 +239,12 @@ enum MarkdownStyler {
         }
     }
 
-    /// Markdown fades the pipes and the |---| line. Rich hides them, bolds
+    /// Markdown fades the pipes and the |---| line. Read hides them, bolds
     /// the header and lays the cells out in columns: the hidden pipe before
     /// each cell is kerned out to where the cell starts, and a wrapped last
     /// cell hangs under its own column. Each row is tagged with the grid's
     /// geometry for BodyNSTextView to draw. The text itself is never touched.
-    private static func styleTable(_ table: Table, in storage: NSTextStorage, mode: BodyMode, look: RichLook,
+    private static func styleTable(_ table: Table, in storage: NSTextStorage, mode: BodyMode, look: ReadLook,
                                    mark: (NSRange) -> Void, trait: (NSRange, NSFontTraitMask) -> Void) {
         func gaps(_ row: (line: NSRange, cells: [NSRange])) -> [NSRange] {
             var gaps: [NSRange] = []
@@ -255,7 +255,7 @@ enum MarkdownStyler {
             }
             return gaps
         }
-        guard mode == .rich else {
+        guard mode == .read else {
             for row in table.rows { gaps(row).forEach { storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: $0) } }
             storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: table.divider)
             return
@@ -286,7 +286,7 @@ enum MarkdownStyler {
         for w in widths.dropLast() { x.append(x.last! + w + 2 * pad) }
         let align = alignments(table, in: storage.string as NSString)
 
-        let base = baseAttributes(.rich, look)[.paragraphStyle] as! NSParagraphStyle
+        let base = baseAttributes(.read, look)[.paragraphStyle] as! NSParagraphStyle
         let lines = x.dropFirst().map { $0 - pad }
         let right = x.last! + widths.last! + pad
         for (r, row) in table.rows.enumerated() {
@@ -336,13 +336,13 @@ enum MarkdownStyler {
             .map { (text as NSString).substring(with: $0.range(at: 1)) }
     }
 
-    static func baseFont(_ mode: BodyMode, _ look: RichLook = .standard) -> NSFont {
-        mode == .rich ? look.body : .monospacedSystemFont(ofSize: 14, weight: .regular)
+    static func baseFont(_ mode: BodyMode, _ look: ReadLook = .standard) -> NSFont {
+        mode == .read ? look.body : .monospacedSystemFont(ofSize: 14, weight: .regular)
     }
 
-    static func baseAttributes(_ mode: BodyMode, _ look: RichLook = .standard) -> [NSAttributedString.Key: Any] {
+    static func baseAttributes(_ mode: BodyMode, _ look: ReadLook = .standard) -> [NSAttributedString.Key: Any] {
         let paragraph = NSMutableParagraphStyle()
-        if mode == .rich, let height = look.lineHeight {
+        if mode == .read, let height = look.lineHeight {
             // The site's line height, as CSS sets it.
             paragraph.minimumLineHeight = height
             paragraph.maximumLineHeight = height
@@ -350,9 +350,9 @@ enum MarkdownStyler {
             // Same line pitch in both views (18 + 4, 17 + 5), so switching
             // doesn't move the text. The blank lines in the markdown already
             // space the paragraphs.
-            paragraph.lineSpacing = mode == .rich ? 4 : 5
+            paragraph.lineSpacing = mode == .read ? 4 : 5
         }
-        let color = mode == .rich ? look.text : NSColor.labelColor
+        let color = mode == .read ? look.text : NSColor.labelColor
         return [.font: baseFont(mode, look), .foregroundColor: color, .paragraphStyle: paragraph]
     }
 }

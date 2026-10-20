@@ -1,7 +1,7 @@
 import AppKit
 import ImageIO
 
-/// Photos shown in the Rich view, fetched from their URLs once per run of
+/// Photos shown in the Read view, fetched from their URLs once per run of
 /// the app. Each is cut down to a screen's worth of pixels, so a folder of
 /// camera originals doesn't fill memory.
 @MainActor

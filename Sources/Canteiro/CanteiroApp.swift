@@ -94,7 +94,7 @@ private struct NewAsideButton: View {
     }
 }
 
-/// View › Show Rich Text / Show Markdown (⌘R), as in iA Writer, and Open
+/// View › Show Read View / Show Markdown (⌘R), as in iA Writer, and Open
 /// in Browser (⌥⌘P).
 private struct BodyModeCommand: Commands {
     let store: SiteStore
@@ -103,8 +103,8 @@ private struct BodyModeCommand: Commands {
 
     var body: some Commands {
         CommandGroup(before: .toolbar) {
-            Button(bodyMode == .rich ? "Show Markdown" : "Show Rich Text") {
-                bodyMode = bodyMode == .rich ? .markdown : .rich
+            Button(bodyMode == .read ? "Show Markdown" : "Show Read View") {
+                bodyMode = bodyMode == .read ? .markdown : .read
             }
             .keyboardShortcut("r")
             OpenInBrowserButton(inMenu: true)

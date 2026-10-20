@@ -1,10 +1,10 @@
 import AppKit
 import CoreText
 
-/// How the Rich view draws text: the app's own look, or the site's, from
-/// canteiro.json's `rich` block. Fonts and colors are immutable, so it's
+/// How the Read view draws text: the app's own look, or the site's, from
+/// canteiro.json's `read` block. Fonts and colors are immutable, so it's
 /// safe to share.
-struct RichLook: Equatable, @unchecked Sendable {
+struct ReadLook: Equatable, @unchecked Sendable {
     var body: NSFont = .systemFont(ofSize: 15)
     /// A family for headings; nil uses the system font.
     var headingFamily: String?
@@ -16,10 +16,10 @@ struct RichLook: Equatable, @unchecked Sendable {
     var headings: NSColor = .labelColor
     var links: NSColor = .linkColor
     var background: NSColor?
-    /// What in the `rich` block couldn't be used, for the sidebar.
+    /// What in the `read` block couldn't be used, for the sidebar.
     var problems: [String] = []
 
-    static let standard = RichLook()
+    static let standard = ReadLook()
 
     func headingFont(level: Int) -> NSFont {
         let size = headingSizes[min(level, headingSizes.count) - 1]
@@ -31,12 +31,12 @@ struct RichLook: Equatable, @unchecked Sendable {
     }
 }
 
-extension RichLook {
+extension ReadLook {
     /// The site's look. Its font files are loaded for this run of the app.
     /// Whatever can't be used stays as the app's and is listed in `problems`.
-    init(_ rich: SiteConfig.Rich, site: URL) {
+    init(_ read: SiteConfig.Read, site: URL) {
         var problems: [String] = []
-        for path in rich.fonts ?? [] {
+        for path in read.fonts ?? [] {
             let files = Self.files(path, site: site)
             if files.isEmpty { problems.append("no font file at \(path)") }
             files.forEach(Self.register)
@@ -47,9 +47,9 @@ extension RichLook {
             problems.append("no font named \"\(name)\"")
             return nil
         }
-        func color(_ pick: (SiteConfig.Rich.Colors) -> String?, _ fallback: NSColor) -> NSColor? {
-            let light = rich.colors.flatMap(pick).flatMap { Self.hex($0, &problems) }
-            let dark = rich.dark.flatMap(pick).flatMap { Self.hex($0, &problems) }
+        func color(_ pick: (SiteConfig.Read.Colors) -> String?, _ fallback: NSColor) -> NSColor? {
+            let light = read.colors.flatMap(pick).flatMap { Self.hex($0, &problems) }
+            let dark = read.dark.flatMap(pick).flatMap { Self.hex($0, &problems) }
             guard light != nil || dark != nil else { return nil }
             return NSColor(name: nil) { appearance in
                 let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
@@ -57,19 +57,19 @@ extension RichLook {
             }
         }
 
-        let size = CGFloat(rich.size ?? 15)
+        let size = CGFloat(read.size ?? 15)
         self.init()
-        body = family(rich.body, size: size) ?? .systemFont(ofSize: size)
-        if family(rich.headings, size: size) != nil { headingFamily = rich.headings }
-        headingSizes = rich.headingSizes.map { $0.map { CGFloat($0) * size } }
-            ?? RichLook.standard.headingSizes.map { $0 * size / 15 }
-        lineHeight = rich.lineHeight.map { CGFloat($0) * size }
-        width = rich.width.map { CGFloat($0) }
+        body = family(read.body, size: size) ?? .systemFont(ofSize: size)
+        if family(read.headings, size: size) != nil { headingFamily = read.headings }
+        headingSizes = read.headingSizes.map { $0.map { CGFloat($0) * size } }
+            ?? ReadLook.standard.headingSizes.map { $0 * size / 15 }
+        lineHeight = read.lineHeight.map { CGFloat($0) * size }
+        width = read.width.map { CGFloat($0) }
         text = color(\.text, .labelColor) ?? .labelColor
         headings = color(\.headings, .labelColor) ?? .labelColor
         links = color(\.links, .linkColor) ?? .linkColor
         background = color(\.background, .clear)
-        self.problems = problems.map { "\(SiteConfig.fileName): rich: \($0)" }
+        self.problems = problems.map { "\(SiteConfig.fileName): read: \($0)" }
     }
 
     /// A path inside the site, with `*` matching in its file name.

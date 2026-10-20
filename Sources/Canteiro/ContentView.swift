@@ -19,13 +19,13 @@ struct ContentView: View {
                 .safeAreaInset(edge: .bottom, spacing: 0) { UploadBar() }
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
-                        // Same text either way; Rich hides the marks.
+                        // Same text either way; Read hides the marks.
                         Picker("View", selection: $bodyMode) {
                             Text("Markdown").tag(BodyMode.markdown)
-                            Text("Rich").tag(BodyMode.rich)
+                            Text("Read").tag(BodyMode.read)
                         }
                         .pickerStyle(.segmented)
-                        .help("Markdown shows the marks, Rich hides them (⌘R)")
+                        .help("Markdown shows the marks, Read hides them (⌘R)")
                     }
                     ToolbarItem(placement: .primaryAction) {
                         OpenInBrowserButton()

@@ -14,8 +14,8 @@ struct BodyTextView: NSViewRepresentable {
     var mode: BodyMode = .markdown
     /// The site's markdown extras to style, from canteiro.json.
     var syntax: Set<SiteConfig.Syntax> = []
-    /// The site's type and colors for Rich, from canteiro.json.
-    var look: RichLook = .standard
+    /// The site's type and colors for Read, from canteiro.json.
+    var look: ReadLook = .standard
     var minHeight: CGFloat = 320
     /// Turns a dropped photo into the markdown to insert (`![](https://…)`).
     var uploadPhoto: (@MainActor (URL) async throws -> String)?
@@ -86,20 +86,20 @@ struct BodyTextView: NSViewRepresentable {
 
         /// A photo arrived: make room for it, and have SwiftUI measure again.
         @objc private func imageLoaded(_ note: Notification) {
-            guard parent.mode == .rich, let url = note.object as? String, view?.string.contains(url) == true else { return }
+            guard parent.mode == .read, let url = note.object as? String, view?.string.contains(url) == true else { return }
             restyle()
             view?.invalidateIntrinsicContentSize()
         }
 
         func restyle() {
             guard let view, let storage = view.textStorage else { return }
-            let images = parent.mode == .rich ? InlineImages.shared.sizes(MarkdownStyler.imageURLs(in: storage.string)) : [:]
+            let images = parent.mode == .read ? InlineImages.shared.sizes(MarkdownStyler.imageURLs(in: storage.string)) : [:]
             MarkdownStyler.style(storage, mode: parent.mode, syntax: parent.syntax, look: parent.look, images: images)
             view.typingAttributes = MarkdownStyler.baseAttributes(parent.mode, parent.look)
             measured = nil
             // Grids and photos move with their text, and TextKit only
             // redraws the text.
-            if parent.mode == .rich, storage.string.contains("|") || !images.isEmpty { view.needsDisplay = true }
+            if parent.mode == .read, storage.string.contains("|") || !images.isEmpty { view.needsDisplay = true }
         }
 
         func height(of storage: NSTextStorage, width: CGFloat) -> CGFloat {
@@ -167,7 +167,7 @@ struct BodyTextView: NSViewRepresentable {
 }
 
 /// An NSTextView that hands dropped photos to the app instead of inserting
-/// their file paths, and draws the grid of Rich tables.
+/// their file paths, and draws the grid of Read tables.
 final class BodyNSTextView: NSTextView {
     var onImageFiles: (([URL], Int) -> Bool)?
     /// The site's markdown extras, so Highlight and Footnote only write

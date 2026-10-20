@@ -55,8 +55,8 @@ struct SiteConfig: Codable, Sendable, Equatable {
         case toc
     }
 
-    /// The site's type and colors, for the Rich view.
-    struct Rich: Codable, Sendable, Equatable {
+    /// The site's type and colors, for the Read view.
+    struct Read: Codable, Sendable, Equatable {
         /// Font files, relative to the site. `*` matches in the file name.
         var fonts: [String]?
         /// Font family names.
@@ -86,7 +86,7 @@ struct SiteConfig: Codable, Sendable, Equatable {
     var uploads: Uploads?
     var podcasts: Podcasts?
     var syntax: Set<Syntax>?
-    var rich: Rich?
+    var read: Read?
     /// The site's `_redirects` file, relative to the site. Renaming a
     /// published entry adds a redirect from its old address there.
     var redirects: String?

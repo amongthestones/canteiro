@@ -23,7 +23,7 @@ CANTEIRO_TEST_SITE=~/Sites/my-site swift test
 - **Reading the config.** `scripts/schema-dump.mjs` loads `keystatic.config.ts` through the site's own Vite, with the site's own Node, and prints it as JSON: the navigation, every collection and singleton, and every field with its type, label, help text, options, defaults and validation. It takes about a quarter of a second. Canteiro keeps no list of fields of its own.
 - **Reading files.** Markdown with YAML frontmatter, YAML, and JSON (read as YAML). Collection paths ending in `*` (files in a folder) and `**` (files in any subfolder) both work.
 - **Writing files.** For markdown and YAML, each save rebuilds the YAML from the original text one top-level key at a time: unchanged keys keep their exact text, and changed or new ones are written in Keystatic's style (block lists, two-space indents, quotes only where needed). The body is written exactly as typed. JSON files are written whole, as JSON. An unchanged entry is never rewritten.
-- **The editor.** One TextKit 2 text view. Both views are attributes laid over the same text: Rich hides marks by drawing them tiny and clear, and lines table cells up by kerning the hidden pipe before each one. The grid is drawn behind the text.
+- **The editor.** One TextKit 2 text view. Both views are attributes laid over the same text: Read hides marks by drawing them tiny and clear, and lines table cells up by kerning the hidden pipe before each one. The grid is drawn behind the text.
 - **Uploads.** R2's S3-compatible API, signed with AWS Signature V4 in the app (tested against Amazon's published example). No SDK.
 - **git.** The system `git`, run as a subprocess, with prompts turned off.
 - **Dependencies.** One Swift package, [Yams](https://github.com/jpsim/Yams), for YAML. Photos use ImageIO and `cwebp`; audio length uses AVFoundation.
@@ -44,8 +44,8 @@ Keystatic's `itemLabel` functions can't be read from the config, so lists use th
 | `EntryEditor.swift`, `FieldControl.swift`, `SettingsForm.swift` | Forms and field controls |
 | `SlugField.swift`, `Renamer.swift` | The slug field, renaming an entry and its redirect |
 | `AssetField.swift` | Image and file fields, and where their files go |
-| `BodyTextView.swift`, `MarkdownStyler.swift` | The body editor and its Markdown and Rich views |
-| `RichLook.swift`, `InlineImages.swift` | Rich's look from `canteiro.json`, and the photos it shows |
+| `BodyTextView.swift`, `MarkdownStyler.swift` | The body editor and its Markdown and Read views |
+| `ReadLook.swift`, `InlineImages.swift` | Read's look from `canteiro.json`, and the photos it shows |
 | `FormatCommands.swift`, `MarkdownFormat.swift` | The Format menu and the edits it makes |
 | `Autosave.swift` | Saving and the changed-on-disk bar |
 | `DraftInbox.swift`, `InboxView.swift` | The inbox |

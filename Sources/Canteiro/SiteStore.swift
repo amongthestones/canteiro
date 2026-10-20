@@ -19,8 +19,8 @@ final class SiteStore {
     private(set) var schema: SiteSchema?
     /// The site's canteiro.json, or the empty config.
     private(set) var config = SiteConfig()
-    /// How Rich draws the site's text, from the config's `rich` block.
-    private(set) var richLook = RichLook.standard
+    /// How Read draws the site's text, from the config's `read` block.
+    private(set) var readLook = ReadLook.standard
     private(set) var entries: [String: [Entry]] = [:]
     private(set) var singletons: [String: Entry] = [:]
     /// Files that didn't parse. Shown, not hidden: a broken file is worth knowing about.
@@ -196,7 +196,7 @@ final class SiteStore {
             // Clearing it first means the inbox always hears of the new
             // site's config, even one the same as the last site's.
             config = SiteConfig()
-            richLook = .standard
+            readLook = .standard
         }
         siteURL = url
         UserDefaults.standard.set(url.path, forKey: Self.siteKey)
@@ -218,8 +218,8 @@ final class SiteStore {
                 configProblem = error.localizedDescription
                 problems.insert(error.localizedDescription, at: 0)
             }
-            richLook = config.rich.map { RichLook($0, site: url) } ?? .standard
-            problems.insert(contentsOf: richLook.problems, at: 0)
+            readLook = config.read.map { ReadLook($0, site: url) } ?? .standard
+            problems.insert(contentsOf: readLook.problems, at: 0)
             refreshChanges()
             sectionOrder = UserDefaults.standard.stringArray(forKey: Self.sectionsKey(url)) ?? []
             if switching {

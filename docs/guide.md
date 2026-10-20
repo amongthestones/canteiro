@@ -23,7 +23,7 @@ Three columns, like Mail.
 - **Sidebar:** your collections and singletons, grouped the way your Keystatic config's `ui.navigation` groups them, with a count beside each collection. Anything the navigation leaves out goes in a last "Other" group, so nothing is hidden. To put the sections in another order, choose View › Arrange Sections… (or right-click a heading) and drag them in the list. The order is kept for each site on this Mac, and Restore Default Order goes back to the config's. Problems reading the site (a file that doesn't parse, a broken `canteiro.json`) are listed at the bottom.
 - **List:** a collection's entries, newest first when it has a date field, else by its first number field. Drafts have an orange dot. Each row is the title, the date, and two lines of the text.
 - **Editor:** the entry's fields on top and the body below. Fields that are empty and optional fold under "More fields", so the top stays short. Singletons skip the list and open straight into their form.
-- **Toolbar:** New Entry, the list filter and sort, search, Markdown or Rich, Open in Browser, and Publish (with a count of changed files).
+- **Toolbar:** New Entry, the list filter and sort, search, Markdown or Read, Open in Browser, and Publish (with a count of changed files).
 
 ## Fields
 
@@ -61,11 +61,11 @@ These files are saved into the repo as they are and show up in Publish with the 
 The body editor grows with its text, so the fields and the body scroll together as one page. Smart quotes and dash substitution are off: markdown is saved as typed.
 
 - **Markdown view:** a monospaced font, with the marks (`#`, `**`, `[`, `](…)`, table pipes) faded but visible.
-- **Rich view (⌘R):** a reading font with the marks hidden. Headings are sized, bold and italics shown, links underlined, quotes and list markers set back, and tables laid out in columns with `:---:` alignment. A photo on a line of its own shows in place of its `![](…)` line once it has loaded from its address. Switch to Markdown to edit the line.
+- **Read view (⌘R):** a reading font with the marks hidden. Headings are sized, bold and italics shown, links underlined, quotes and list markers set back, and tables laid out in columns with `:---:` alignment. A photo on a line of its own shows in place of its `![](…)` line once it has loaded from its address. Switch to Markdown to edit the line.
 
-Rich is not a separate editor that converts to and from markdown. It's the same text drawn differently, so the file on disk is what you typed in either view.
+Read is not a separate editor that converts to and from markdown. It's the same text drawn differently, so the file on disk is what you typed in either view.
 
-Rich can also take your site's type and colors: its fonts, text size, line height, reading width and colors, in light and dark mode. You name them in the `rich` block of `canteiro.json`. Writing then looks close to the published page, and Open in Browser shows the real thing.
+Read can also take your site's type and colors: its fonts, text size, line height, reading width and colors, in light and dark mode. You name them in the `read` block of `canteiro.json`. Writing then looks close to the published page, and Open in Browser shows the real thing.
 
 Your site's own markdown extras can be styled too, if `canteiro.json` names them: `==highlights==`, iA Writer's `[^inline footnotes]`, `^^^callouts^^^` and `{{TOC}}`.
 
@@ -166,7 +166,7 @@ The bucket and public address belong to the site and come from its `canteiro.jso
 | ⌃⌥A | New aside, from any app |
 | ⌘↩ | Save the aside |
 | ⌘S | Save now |
-| ⌘R | Switch between Markdown and Rich |
+| ⌘R | Switch between Markdown and Read |
 | ⌥⌘P | Open the entry in the browser |
 | ⌘O | Open a site |
 | ⌘1 to ⌘9 | Open a recent site (File › Open Recent) |

@@ -21,8 +21,8 @@ import Testing
         (attrs[.foregroundColor] as? NSColor) == .clear
     }
 
-    @Test func richHidesTheMarksAndShowsTheResult() {
-        let s = styled(.rich)
+    @Test func readHidesTheMarksAndShowsTheResult() {
+        let s = styled(.read)
         #expect(s.string == text, "styling never changes the text")
         #expect(hidden(at(s, "## ")))
         #expect((at(s, "Better")[.font] as? NSFont)?.pointSize == 21)
@@ -57,9 +57,9 @@ import Testing
                 "an escaped pipe stays in its cell")
     }
 
-    @Test func richLinesTheColumnsUp() {
+    @Test func readLinesTheColumnsUp() {
         let s = NSTextStorage(string: table)
-        MarkdownStyler.style(s, mode: .rich)
+        MarkdownStyler.style(s, mode: .read)
         #expect(s.string == table, "styling never changes the text")
         #expect(hidden(at(s, "| Account")))
         #expect(hidden(at(s, "|---")))
@@ -85,10 +85,10 @@ import Testing
         #expect(at(s, "| Instagram", offset: 11)[.kern] == nil, "the mono view keeps its own spacing")
     }
 
-    @Test func richAlignsColumnsFromTheColons() {
+    @Test func readAlignsColumnsFromTheColons() {
         let text = "| Item | Count | Note |\n|:---|---:|:---:|\n| Apples | 3 | ok |\n| Pears | 120 | fine |\n"
         let s = NSTextStorage(string: text)
-        MarkdownStyler.style(s, mode: .rich)
+        MarkdownStyler.style(s, mode: .read)
         #expect(MarkdownStyler.alignments(MarkdownStyler.tables(in: text as NSString)[0], in: text as NSString) == [.left, .right, .center])
         // Where a cell ends, from the start of its line.
         func end(_ row: String, _ cell: String) -> CGFloat {
@@ -100,31 +100,31 @@ import Testing
         #expect(abs(end("| Apples", "ok") - end("| Pears", "fine")) > 1, "centered cells don't")
     }
 
-    @Test func onlyRichTagsTheGrid() {
-        let rich = NSTextStorage(string: table), plain = NSTextStorage(string: table)
-        MarkdownStyler.style(rich, mode: .rich)
+    @Test func onlyReadTagsTheGrid() {
+        let read = NSTextStorage(string: table), plain = NSTextStorage(string: table)
+        MarkdownStyler.style(read, mode: .read)
         MarkdownStyler.style(plain, mode: .markdown)
-        let header = at(rich, "Account")[.tableGrid] as? TableGrid
+        let header = at(read, "Account")[.tableGrid] as? TableGrid
         #expect(header?.header == true)
         #expect(header?.lines.count == 1)
-        #expect(at(rich, "|---")[.tableGrid] as? TableGrid === header, "the divider joins the header's cell")
-        #expect((at(rich, "Instagram")[.tableGrid] as? TableGrid)?.header == false)
-        #expect(at(rich, "Intro")[.tableGrid] == nil)
+        #expect(at(read, "|---")[.tableGrid] as? TableGrid === header, "the divider joins the header's cell")
+        #expect((at(read, "Instagram")[.tableGrid] as? TableGrid)?.header == false)
+        #expect(at(read, "Intro")[.tableGrid] == nil)
         #expect(at(plain, "Account")[.tableGrid] == nil)
     }
-    @Test func richMakesRoomForALoadedPhoto() {
+    @Test func readMakesRoomForALoadedPhoto() {
         let url = "https://media.example.com/a.jpg"
         let text = "Before.\n\n![](\(url))\n\nAfter ![](\(url)) inline.\n"
         #expect(MarkdownStyler.imageURLs(in: text) == [url, url])
         let s = NSTextStorage(string: text)
-        MarkdownStyler.style(s, mode: .rich, images: [url: NSSize(width: 1200, height: 900)])
+        MarkdownStyler.style(s, mode: .read, images: [url: NSSize(width: 1200, height: 900)])
         #expect(s.string == text, "the photo is drawn, never inserted")
         let photo = at(s, "![](")[.inlineImage] as? InlineImage
         #expect(photo?.size == NSSize(width: 600, height: 450))
         #expect((at(s, "![](")[.paragraphStyle] as? NSParagraphStyle)?.paragraphSpacingBefore == 450)
         #expect(hidden(at(s, "![](")), "the photo stands in for its line")
         let first = NSTextStorage(string: "![](\(url))\n")
-        MarkdownStyler.style(first, mode: .rich, images: [url: NSSize(width: 1200, height: 900)])
+        MarkdownStyler.style(first, mode: .read, images: [url: NSSize(width: 1200, height: 900)])
         #expect((first.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?.minimumLineHeight == 451,
                 "the first line can't have space before it, so it grows")
         #expect(at(s, "After")[.inlineImage] == nil, "only a photo on its own line")

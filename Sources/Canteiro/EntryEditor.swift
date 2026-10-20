@@ -63,9 +63,9 @@ struct EntryEditor: View {
                     Divider()
                 }
                 if item.bodyField != nil {
-                    BodyTextView(text: $text, mode: bodyMode, syntax: store.config.extras, look: store.richLook,
+                    BodyTextView(text: $text, mode: bodyMode, syntax: store.config.extras, look: store.readLook,
                                  uploadPhoto: uploadPhoto, onError: { store.lastError = $0 })
-                        .frame(maxWidth: bodyMode == .rich ? store.richLook.width : nil, alignment: .leading)
+                        .frame(maxWidth: bodyMode == .read ? store.readLook.width : nil, alignment: .leading)
                         .padding(.top, 18)
                 }
             }
@@ -74,7 +74,7 @@ struct EntryEditor: View {
             .frame(maxWidth: 820, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(bodyMode == .rich ? store.richLook.background.map(Color.init(nsColor:)) : nil)
+        .background(bodyMode == .read ? store.readLook.background.map(Color.init(nsColor:)) : nil)
         .environment(\.guidField, store.isEpisodes(item) ? store.config.guidField : nil)
         .environment(\.entryRename, item.kind == .collection ? EntryRename(
             slug: entry.slug,

@@ -2,7 +2,7 @@
 
 A native Mac editor for an Astro site that uses [Keystatic](https://keystatic.com). It makes its forms from the site's own `keystatic.config.ts`, edits the markdown, YAML and JSON files in place, uploads photos and podcast audio to Cloudflare R2, and publishes by committing and pushing with git.
 
-![Canteiro editing a post in the Rich view, with the sidebar, the list of posts and the post's fields above its text](docs/images/editor.jpg)
+![Canteiro editing a post in the Read view, with the sidebar, the list of posts and the post's fields above its text](docs/images/editor.jpg)
 
 It started as the editor for one site and is in daily use there, but nothing about any site is written into the app. What Canteiro can't learn from the Keystatic config comes from a small `canteiro.json` in the site's repo, so any Keystatic site should open.
 
@@ -10,7 +10,7 @@ It started as the editor for one site and is in daily use there, but nothing abo
 
 - **Forms from your Keystatic config.** Every collection and singleton gets a sidebar row and a form, with Keystatic's labels, help text, options, defaults and limits. Add a field in Keystatic and it shows up in Canteiro.
 - **Edits the files themselves.** No database and no copy of your content. A save changes only the lines you changed, so git diffs stay small, and it never writes over a change made on disk by something else.
-- **Markdown or Rich.** Two views of the same text: one with the marks faded, one with them hidden and the result shown. The file is always exactly what you typed.
+- **Markdown or Read.** Two views of the same text: one with the marks faded, one with them hidden and the result shown. The file is always exactly what you typed.
 - **Photos to R2.** Drop a photo into the body. It's resized, converted to WebP, stripped of its metadata (location included), uploaded and linked.
 - **Podcast episodes from an MP3.** Drop an MP3 on a show's list and it becomes a draft episode with its number, guid and duration filled in.
 - **An inbox for drafts written elsewhere,** such as iA Writer in iCloud, ready to finish and import.

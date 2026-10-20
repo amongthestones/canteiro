@@ -133,15 +133,15 @@ struct DraftEditor: View {
 
     var body: some View {
         ScrollView {
-            BodyTextView(text: $text, mode: bodyMode, syntax: store.config.extras, look: store.richLook,
+            BodyTextView(text: $text, mode: bodyMode, syntax: store.config.extras, look: store.readLook,
                          uploadPhoto: EntryEditor.photoUploader(store), onError: { store.lastError = $0 })
-                .frame(maxWidth: bodyMode == .rich ? store.richLook.width : nil, alignment: .leading)
+                .frame(maxWidth: bodyMode == .read ? store.readLook.width : nil, alignment: .leading)
                 .padding(.horizontal, 32)
                 .padding(.vertical, 18)
                 .frame(maxWidth: 820, alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(bodyMode == .rich ? store.richLook.background.map(Color.init(nsColor:)) : nil)
+        .background(bodyMode == .read ? store.readLook.background.map(Color.init(nsColor:)) : nil)
         .safeAreaInset(edge: .top, spacing: 0) { banner }
         .onAppear {
             text = inbox.open(draft.url)

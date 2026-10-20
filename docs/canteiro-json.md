@@ -31,7 +31,7 @@ A full example:
   },
   "syntax": ["highlight", "inlineFootnotes", "callouts", "toc"],
   "redirects": "public/_redirects",
-  "rich": {
+  "read": {
     "fonts": [
       "node_modules/@fontsource/noto-serif/files/noto-serif-latin-400-normal.woff2",
       "node_modules/@fontsource/noto-serif/files/noto-serif-latin-700-normal.woff2",
@@ -80,7 +80,7 @@ A field that isn't in the collection is skipped, so a show without, say, a durat
 
 Markdown your site's remark or rehype plugins add, for the editor to style:
 
-| Value | Syntax | In the Rich view |
+| Value | Syntax | In the Read view |
 |---|---|---|
 | `highlight` | `==text==` | a yellow highlight |
 | `inlineFootnotes` | `[^note text]` | the note small and raised |
@@ -97,9 +97,9 @@ When you change the slug of an entry that's live (published and not a draft), it
 
 Without it, Canteiro still warns before renaming a live entry, and the redirect is up to you.
 
-## rich
+## read
 
-How the Rich view looks, copied from your site's CSS so writing looks close to the published page. Markdown view keeps its monospaced look either way. Every key is optional, and anything left out stays as Canteiro's own.
+How the Read view looks, copied from your site's CSS so writing looks close to the published page. Markdown view keeps its monospaced look either way. Every key is optional, and anything left out stays as Canteiro's own.
 
 | Key | Meaning |
 |---|---|
@@ -113,4 +113,4 @@ How the Rich view looks, copied from your site's CSS so writing looks close to t
 | `colors` | Hex colors for `text`, `headings`, `links` and the page `background`. |
 | `dark` | The same colors for dark mode. Without them, dark mode keeps Canteiro's own colors, so dark text never lands on a dark window. |
 
-If a font file or family isn't found, or a color isn't hex, Rich uses Canteiro's own for that part and the problem is listed in the sidebar, for example `canteiro.json: rich: no font named "Noto Serif"`.
+If a font file or family isn't found, or a color isn't hex, Read uses Canteiro's own for that part and the problem is listed in the sidebar, for example `canteiro.json: read: no font named "Noto Serif"`.
