@@ -19,6 +19,8 @@ final class SiteStore {
     private(set) var schema: SiteSchema?
     /// The site's canteiro.json, or the empty config.
     private(set) var config = SiteConfig()
+    /// How Rich draws the site's text, from the config's `rich` block.
+    private(set) var richLook = RichLook.standard
     private(set) var entries: [String: [Entry]] = [:]
     private(set) var singletons: [String: Entry] = [:]
     /// Files that didn't parse. Shown, not hidden: a broken file is worth knowing about.
@@ -34,12 +36,10 @@ final class SiteStore {
     private(set) var changes: [GitChange] = []
     /// Uploads in flight, for the bar at the bottom of the window.
     private(set) var uploads: [Upload] = []
+    /// The site's build after the last push.
+    let build = BuildWatch()
     /// The last thing that went wrong with a new entry or an upload.
     var lastError: String?
-    /// Whether the preview window is open, for the toolbar's eye button.
-    var previewOpen = false
-    /// Counts saves, so the preview knows to reload.
-    private(set) var saveCount = 0
     /// Bumped when an entry is reread from disk, so its editor starts over.
     private(set) var revisions: [Entry.ID: Int] = [:]
 
@@ -48,6 +48,8 @@ final class SiteStore {
     }
     /// The collection a New Entry sheet is open for.
     var newEntryItem: SchemaItem?
+    /// Whether the Arrange Sections sheet is open.
+    var arrangingSections = false
     var selectedEntry: [String: Entry.ID] = [:] {
         didSet { rememberPlace() }
     }
@@ -88,6 +90,34 @@ final class SiteStore {
     }
 
     nonisolated static func placeKey(_ site: URL) -> String { "place." + site.path }
+    nonisolated static func sectionsKey(_ site: URL) -> String { "sections." + site.path }
+
+    /// The sidebar's sections as arranged on this Mac for this site: group
+    /// names, and DraftInbox.sidebarKey for the inbox. Empty keeps the
+    /// config's order.
+    private(set) var sectionOrder: [String] = []
+
+    func arrangeSections(_ order: [String]) {
+        sectionOrder = order
+        guard let siteURL else { return }
+        if order.isEmpty {
+            UserDefaults.standard.removeObject(forKey: Self.sectionsKey(siteURL))
+        } else {
+            UserDefaults.standard.set(order, forKey: Self.sectionsKey(siteURL))
+        }
+    }
+
+    /// `names` (the config's order) arranged by `saved`. A section the saved
+    /// order doesn't know, like a group new to the config, keeps its place
+    /// after the section it follows in the config.
+    nonisolated static func arranged(_ names: [String], by saved: [String]) -> [String] {
+        var result = saved.filter(names.contains)
+        for (index, name) in names.enumerated() where !result.contains(name) {
+            let after = names[..<index].last(where: result.contains).flatMap { result.firstIndex(of: $0) }
+            result.insert(name, at: after.map { $0 + 1 } ?? 0)
+        }
+        return result
+    }
 
     /// Saves the sidebar item and each list's entry for this site, so coming
     /// back to it lands in the same place. Not while a site is loading, when
@@ -166,6 +196,7 @@ final class SiteStore {
             // Clearing it first means the inbox always hears of the new
             // site's config, even one the same as the last site's.
             config = SiteConfig()
+            richLook = .standard
         }
         siteURL = url
         UserDefaults.standard.set(url.path, forKey: Self.siteKey)
@@ -187,7 +218,10 @@ final class SiteStore {
                 configProblem = error.localizedDescription
                 problems.insert(error.localizedDescription, at: 0)
             }
+            richLook = config.rich.map { RichLook($0, site: url) } ?? .standard
+            problems.insert(contentsOf: richLook.problems, at: 0)
             refreshChanges()
+            sectionOrder = UserDefaults.standard.stringArray(forKey: Self.sectionsKey(url)) ?? []
             if switching {
                 restorePlace(url, schema: schema)
             } else if selectedItem == nil || (selectedItem != DraftInbox.sidebarKey && schema.item(selectedItem!) == nil) {
@@ -269,7 +303,6 @@ final class SiteStore {
             replace(saved, in: item)
             conflicts.remove(id)
             saveErrors[id] = nil
-            saveCount += 1
             refreshChanges()
         } catch {
             saveErrors[id] = error.localizedDescription
@@ -322,7 +355,6 @@ final class SiteStore {
         entries[item.key] = Self.sorted((entries[item.key] ?? []) + [entry], item: item)
         selectedItem = item.key
         selectedEntry[item.key] = entry.id
-        saveCount += 1
         refreshChanges()
         return entry
     }
@@ -363,7 +395,6 @@ final class SiteStore {
             conflicts.remove(id)
             saveErrors[id] = nil
         }
-        saveCount += 1
         refreshChanges()
         return trashed
     }
@@ -538,6 +569,83 @@ final class SiteStore {
         }
     }
 
+    /// What renaming an entry would mean: whether it's live (committed and
+    /// not a draft), its address now and after, and the redirects file
+    /// that would send one to the other.
+    struct RenameCheck {
+        let isLive: Bool
+        let oldAddress: String?
+        let newAddress: String?
+        let redirects: String?
+    }
+
+    func renameCheck(_ item: SchemaItem, id: Entry.ID, to typed: String) -> RenameCheck? {
+        guard let siteURL, let entry = current(item, id: id) else { return nil }
+        let slug = Renamer.slug(typed, replacing: entry.slug)
+        let path = String(entry.url.path.dropFirst(siteURL.path.count + 1))
+        let live = entry.data["draft"]?.bool != true && Git.isCommitted(siteURL, path)
+        let address = { (slug: String) in item.previewUrl?.replacingOccurrences(of: "{slug}", with: slug) }
+        return RenameCheck(isLive: live, oldAddress: address(entry.slug), newAddress: address(slug), redirects: config.redirects)
+    }
+
+    /// Gives a collection entry a new slug: its file and its folders move,
+    /// paths in it follow, and a live entry gets a redirect from its old
+    /// address when the site names a redirects file. The renamed entry
+    /// takes the selection.
+    func rename(_ item: SchemaItem, id: Entry.ID, to typed: String) throws {
+        guard let siteURL, item.kind == .collection, let entry = current(item, id: id) else { return }
+        let slug = Renamer.slug(typed, replacing: entry.slug)
+        guard slug != entry.slug else { return }
+        guard entries[item.key]?.contains(where: { $0.slug == slug }) != true else { throw Renamer.Failure.sameName }
+        let check = renameCheck(item, id: id, to: typed)
+        let plan = Renamer.plan(site: siteURL, item: item, from: entry.slug, to: slug)
+        let oldFile = String(entry.url.path.dropFirst(siteURL.path.count + 1))
+        let newFile = oldFile.replacingOccurrences(of: plan.moves[0].from, with: plan.moves[0].to, options: .anchored)
+        try Renamer.apply(plan, site: siteURL, entry: newFile)
+        if let check, check.isLive, let file = check.redirects, let old = check.oldAddress, let new = check.newAddress {
+            try Renamer.redirect(siteURL.appending(path: file), from: old, to: new)
+        }
+        let fresh = try ContentLoader.read(siteURL.appending(path: newFile), slug: slug, site: siteURL, hasBody: item.format.contentField != nil)
+        entries[item.key] = (entries[item.key] ?? []).filter { $0.id != id } + [fresh]
+        selectedEntry[item.key] = fresh.id
+        conflicts.remove(id)
+        saveErrors[id] = nil
+        refreshChanges()
+    }
+
+    /// Undoes a change since the last commit (see Git.discard). An entry
+    /// open in an editor is read again, so the editor can't save its copy
+    /// back over the file.
+    func discard(_ change: GitChange) async {
+        guard let siteURL, let schema else { return }
+        do {
+            try await Task.detached { try Git.discard(siteURL, change) }.value
+        } catch {
+            lastError = "\(change.path): \(error.localizedDescription)"
+            refreshChanges()
+            return
+        }
+        if change.isDeleted {
+            // The entry comes back, and only a fresh read lists it.
+            reload()
+            return
+        }
+        let exists = FileManager.default.fileExists(atPath: siteURL.appending(path: change.path).path)
+        for item in schema.items {
+            if item.kind == .singleton, let entry = singletons[item.key], entry.id == change.path {
+                reread(item, id: entry.id)
+            } else if let list = entries[item.key], list.contains(where: { $0.id == change.path }) {
+                if exists {
+                    reread(item, id: change.path)
+                } else {
+                    entries[item.key] = list.filter { $0.id != change.path }
+                    if selectedEntry[item.key] == change.path { selectedEntry[item.key] = entries[item.key]?.first?.id }
+                }
+            }
+        }
+        refreshChanges()
+    }
+
     /// Changes to files Keystatic manages: the ones Publish ticks for you.
     /// Code changes in progress are listed but left unticked.
     var contentChanges: [GitChange] { changes.filter { isContent($0.path) } }
@@ -567,7 +675,7 @@ final class SiteStore {
     }
 
     /// The site address of what's open, from Keystatic's previewUrl. A
-    /// settings page has none, so it previews the home page.
+    /// settings page has none, so it opens the home page.
     var previewPath: String? {
         guard let key = selectedItem, let item = schema?.item(key) else { return nil }
         if item.kind == .singleton { return "/" }

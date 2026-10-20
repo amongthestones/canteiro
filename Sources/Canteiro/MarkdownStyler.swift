@@ -1,7 +1,8 @@
 import AppKit
 
-/// How the body is shown. Both edit the same text; Rich only draws it
-/// differently, so the file on disk is exactly what was typed either way.
+/// How the entry is shown. Markdown and Rich edit the same text; Rich only
+/// draws it differently, so the file on disk is exactly what was typed
+/// either way.
 enum BodyMode: String {
     case markdown, rich
 }
@@ -11,14 +12,15 @@ enum BodyMode: String {
 /// the result shown. A site's own syntax, from its canteiro.json, comes on
 /// top: ==highlights==, [^inline footnotes], ^^^callouts^^^ and {{TOC}}.
 enum MarkdownStyler {
-    static func style(_ storage: NSTextStorage, mode: BodyMode, syntax: Set<SiteConfig.Syntax> = []) {
+    static func style(_ storage: NSTextStorage, mode: BodyMode, syntax: Set<SiteConfig.Syntax> = [], look: RichLook = .standard,
+                      images: [String: NSSize] = [:]) {
         let text = storage.string as NSString
         let all = NSRange(location: 0, length: text.length)
         let rich = mode == .rich
-        let base = baseFont(mode)
+        let base = baseFont(mode, look)
 
         storage.beginEditing()
-        storage.setAttributes(baseAttributes(mode), range: all)
+        storage.setAttributes(baseAttributes(mode, look), range: all)
 
         func each(_ pattern: String, _ options: NSRegularExpression.Options = [.anchorsMatchLines], _ body: (NSTextCheckingResult) -> Void) {
             guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else { return }
@@ -27,7 +29,8 @@ enum MarkdownStyler {
         func mark(_ range: NSRange) {
             guard range.location != NSNotFound, range.length > 0 else { return }
             if rich {
-                storage.addAttributes([.font: NSFont.systemFont(ofSize: 0.1), .foregroundColor: NSColor.clear], range: range)
+                // Tiny enough that a long hidden URL leaves no gap.
+                storage.addAttributes([.font: NSFont.systemFont(ofSize: 0.01), .foregroundColor: NSColor.clear], range: range)
             } else {
                 storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: range)
             }
@@ -42,10 +45,17 @@ enum MarkdownStyler {
         // Headings: # to ######.
         each(#"^(#{1,6})([ \t]+)(.+)$"#) { m in
             let level = m.range(at: 1).length
-            let sizes: [CGFloat] = [26, 21, 18, 16, 15, 15]
-            let font = rich ? NSFont.systemFont(ofSize: sizes[level - 1], weight: .bold)
-                            : NSFont.monospacedSystemFont(ofSize: 14, weight: .bold)
+            let font = rich ? look.headingFont(level: level) : NSFont.monospacedSystemFont(ofSize: 14, weight: .bold)
             storage.addAttribute(.font, value: font, range: m.range(at: 3))
+            if rich {
+                storage.addAttribute(.foregroundColor, value: look.headings, range: m.range(at: 3))
+                // A heading takes its own font's height, not the body's.
+                if look.lineHeight != nil {
+                    let style = NSMutableParagraphStyle()
+                    style.lineSpacing = 4
+                    storage.addAttribute(.paragraphStyle, value: style, range: m.range)
+                }
+            }
             mark(NSRange(location: m.range(at: 1).location, length: m.range(at: 1).length + m.range(at: 2).length))
         }
         // Bold, then italic.
@@ -87,15 +97,34 @@ enum MarkdownStyler {
         }
         // [links](url "title"), not images.
         each(#"(?<!!)\[([^\]\n]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)"#) { m in
-            storage.addAttribute(.foregroundColor, value: NSColor.linkColor, range: m.range(at: 1))
+            storage.addAttribute(.foregroundColor, value: rich ? look.links : NSColor.linkColor, range: m.range(at: 1))
             if rich { storage.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: m.range(at: 1)) }
             mark(NSRange(location: m.range.location, length: 1))
             mark(NSRange(location: NSMaxRange(m.range(at: 1)), length: NSMaxRange(m.range) - NSMaxRange(m.range(at: 1))))
         }
-        // ![images](url "caption"): kept visible, set back.
-        each(#"!\[[^\]\n]*\]\([^)\n]+\)"#) { m in
+        // ![images](url "caption"): kept visible, set back. In Rich, a photo
+        // on a line of its own that has loaded takes the line's place: the
+        // line is hidden, and gets room above it where BodyNSTextView draws
+        // the photo. TextKit leaves out the space before a document's first
+        // paragraph, so a photo there makes its line tall instead.
+        each(imagePattern) { m in
             storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: m.range)
-            if rich { storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 12), range: m.range) }
+            guard rich else { return }
+            storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 12), range: m.range)
+            let line = text.lineRange(for: m.range)
+            guard let size = images[text.substring(with: m.range(at: 1))],
+                  text.substring(with: line).trimmingCharacters(in: .whitespacesAndNewlines) == text.substring(with: m.range),
+                  size.width > 0, size.height > 0 else { return }
+            let scale = min(1, (look.width ?? 600) / size.width, 520 / size.height)
+            let shown = NSSize(width: (size.width * scale).rounded(), height: (size.height * scale).rounded())
+            let style = (storage.attribute(.paragraphStyle, at: line.location, effectiveRange: nil) as! NSParagraphStyle).mutableCopy() as! NSMutableParagraphStyle
+            let room = shown.height
+            mark(m.range)
+            style.lineSpacing = 0
+            style.minimumLineHeight = imageLine + (line.location == 0 ? room : 0)
+            style.maximumLineHeight = style.minimumLineHeight
+            style.paragraphSpacingBefore = line.location == 0 ? 0 : room
+            storage.addAttributes([.paragraphStyle: style, .inlineImage: InlineImage(url: text.substring(with: m.range(at: 1)), size: shown)], range: line)
         }
         // ^^^callouts^^^, one line or fenced.
         if syntax.contains(.callouts) {
@@ -123,7 +152,7 @@ enum MarkdownStyler {
         }
         // Tables last, so cells are measured with their links and bold done.
         for table in tables(in: text) {
-            styleTable(table, in: storage, mode: mode, mark: mark, trait: trait)
+            styleTable(table, in: storage, mode: mode, look: look, mark: mark, trait: trait)
         }
         storage.endEditing()
     }
@@ -215,7 +244,7 @@ enum MarkdownStyler {
     /// each cell is kerned out to where the cell starts, and a wrapped last
     /// cell hangs under its own column. Each row is tagged with the grid's
     /// geometry for BodyNSTextView to draw. The text itself is never touched.
-    private static func styleTable(_ table: Table, in storage: NSTextStorage, mode: BodyMode,
+    private static func styleTable(_ table: Table, in storage: NSTextStorage, mode: BodyMode, look: RichLook,
                                    mark: (NSRange) -> Void, trait: (NSRange, NSFontTraitMask) -> Void) {
         func gaps(_ row: (line: NSRange, cells: [NSRange])) -> [NSRange] {
             var gaps: [NSRange] = []
@@ -257,7 +286,7 @@ enum MarkdownStyler {
         for w in widths.dropLast() { x.append(x.last! + w + 2 * pad) }
         let align = alignments(table, in: storage.string as NSString)
 
-        let base = baseAttributes(.rich)[.paragraphStyle] as! NSParagraphStyle
+        let base = baseAttributes(.rich, look)[.paragraphStyle] as! NSParagraphStyle
         let lines = x.dropFirst().map { $0 - pad }
         let right = x.last! + widths.last! + pad
         for (r, row) in table.rows.enumerated() {
@@ -295,15 +324,36 @@ enum MarkdownStyler {
         }
     }
 
-    static func baseFont(_ mode: BodyMode) -> NSFont {
-        mode == .rich ? .systemFont(ofSize: 15) : .monospacedSystemFont(ofSize: 14, weight: .regular)
+    /// The height of a photo's hidden `![](…)` line, under the photo.
+    static let imageLine: CGFloat = 1
+
+    private static let imagePattern = #"!\[[^\]\n]*\]\(([^)\s]+)[^)\n]*\)"#
+
+    /// The addresses of the body's images, for loading.
+    static func imageURLs(in text: String) -> [String] {
+        guard text.contains("!["), let regex = try? NSRegularExpression(pattern: imagePattern) else { return [] }
+        return regex.matches(in: text, range: NSRange(location: 0, length: (text as NSString).length))
+            .map { (text as NSString).substring(with: $0.range(at: 1)) }
     }
 
-    static func baseAttributes(_ mode: BodyMode) -> [NSAttributedString.Key: Any] {
+    static func baseFont(_ mode: BodyMode, _ look: RichLook = .standard) -> NSFont {
+        mode == .rich ? look.body : .monospacedSystemFont(ofSize: 14, weight: .regular)
+    }
+
+    static func baseAttributes(_ mode: BodyMode, _ look: RichLook = .standard) -> [NSAttributedString.Key: Any] {
         let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = mode == .rich ? 6 : 5
-        paragraph.paragraphSpacing = mode == .rich ? 6 : 0
-        return [.font: baseFont(mode), .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph]
+        if mode == .rich, let height = look.lineHeight {
+            // The site's line height, as CSS sets it.
+            paragraph.minimumLineHeight = height
+            paragraph.maximumLineHeight = height
+        } else {
+            // Same line pitch in both views (18 + 4, 17 + 5), so switching
+            // doesn't move the text. The blank lines in the markdown already
+            // space the paragraphs.
+            paragraph.lineSpacing = mode == .rich ? 4 : 5
+        }
+        let color = mode == .rich ? look.text : NSColor.labelColor
+        return [.font: baseFont(mode, look), .foregroundColor: color, .paragraphStyle: paragraph]
     }
 }
 

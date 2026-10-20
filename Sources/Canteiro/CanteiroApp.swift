@@ -22,20 +22,6 @@ struct CanteiroApp: App {
         }
         .defaultSize(width: 1280, height: 820)
 
-        // The open entry as the site renders it. Its own window, so it can sit
-        // beside the editor or on another screen at any size.
-        Window("Preview", id: "preview") {
-            PreviewPane()
-                .environment(store)
-                .environment(preview)
-                .frame(minWidth: 360, minHeight: 400)
-                .navigationTitle("Preview")
-                .onAppear { store.previewOpen = true }
-                .onDisappear { store.previewOpen = false }
-        }
-        .defaultSize(width: 620, height: 820)
-        .defaultPosition(.trailing)
-
         Window("New Aside", id: "aside") {
             QuickAsideView()
                 .environment(store)
@@ -51,7 +37,11 @@ struct CanteiroApp: App {
         }
         .commands {
             SaveCommand()
-            BodyModeCommand()
+            BodyModeCommand(store: store, server: preview)
+            CommandGroup(after: .sidebar) {
+                Button("Arrange Sections…") { store.arrangingSections = true }
+                    .disabled(store.schema == nil)
+            }
             FormatCommands()
             CommandGroup(replacing: .newItem) {
                 NewEntryButton(inMenu: true)
@@ -104,16 +94,22 @@ private struct NewAsideButton: View {
     }
 }
 
-/// View › Show Rich Text / Show Markdown (⌘R), as in iA Writer.
+/// View › Show Rich Text / Show Markdown (⌘R), as in iA Writer, and Open
+/// in Browser (⌥⌘P).
 private struct BodyModeCommand: Commands {
+    let store: SiteStore
+    let server: PreviewServer
     @AppStorage("bodyMode") private var bodyMode = BodyMode.markdown
 
     var body: some Commands {
         CommandGroup(before: .toolbar) {
-            Button(bodyMode == .markdown ? "Show Rich Text" : "Show Markdown") {
-                bodyMode = bodyMode == .markdown ? .rich : .markdown
+            Button(bodyMode == .rich ? "Show Markdown" : "Show Rich Text") {
+                bodyMode = bodyMode == .rich ? .markdown : .rich
             }
             .keyboardShortcut("r")
+            OpenInBrowserButton(inMenu: true)
+                .environment(store)
+                .environment(server)
             Divider()
         }
     }

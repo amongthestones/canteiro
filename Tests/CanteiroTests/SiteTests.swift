@@ -99,4 +99,14 @@ import Testing
         #expect(SiteStore.placeKey(a) != SiteStore.placeKey(b))
         #expect(DraftInbox.folderKey(a) == "inboxPath./Sites/a")
     }
+
+    @Test func sectionsKeepTheirMovedOrder() {
+        let config = ["Writing", "Podcasts", "Site", "inbox"]
+        #expect(SiteStore.arranged(config, by: []) == config)
+        #expect(SiteStore.arranged(config, by: ["inbox", "Writing", "Podcasts", "Site"]) == ["inbox", "Writing", "Podcasts", "Site"])
+        // A group new to the config lands after the one it follows there,
+        // and one that's gone is dropped.
+        #expect(SiteStore.arranged(["Writing", "Tales", "Site", "inbox"], by: ["inbox", "Writing", "Podcasts", "Site"])
+                == ["inbox", "Writing", "Tales", "Site"])
+    }
 }

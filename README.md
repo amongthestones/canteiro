@@ -15,7 +15,7 @@ It started as the editor for one site and is in daily use there, but nothing abo
 - **Podcast episodes from an MP3.** Drop an MP3 on a show's list and it becomes a draft episode with its number, guid and duration filled in.
 - **An inbox for drafts written elsewhere,** such as iA Writer in iCloud, ready to finish and import.
 - **Quick asides** from a small window, or from any app with a global shortcut.
-- **Preview** with the site's own `astro dev` server, and **Publish**: pick the changed files, read their diffs, commit and push.
+- **Open in Browser** with the site's own `astro dev` server, drafts included, and **Publish**: pick the changed files, read their diffs, commit and push.
 
 ## What it needs
 
@@ -72,7 +72,7 @@ Canteiro sends nothing anywhere except your files to your own R2 bucket and your
 
 ## More
 
-- [Guide](docs/guide.md): the window, every field type, photos, podcast episodes, the inbox, preview, publish and keyboard shortcuts.
+- [Guide](docs/guide.md): the window, every field type, photos, podcast episodes, the inbox, opening in the browser, publish and keyboard shortcuts.
 - [canteiro.json](docs/canteiro-json.md): everything the file can hold.
 - [Development](docs/development.md): how it works, tests and the source files.
 

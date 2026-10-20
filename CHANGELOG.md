@@ -4,6 +4,16 @@ What changed in each version of Canteiro, newest first. Downloads are on [Releas
 
 ## Unreleased
 
+- Rich no longer adds extra space between paragraphs. Its lines are as tall as Markdown's, so switching views (⌘R) doesn't move the text.
+- An entry's slug has its own row under the title and can be changed. Its file, image folders and image paths move with it. Renaming a live entry asks first and adds a redirect from the old address when `canteiro.json` names a `redirects` file.
+- The sidebar's sections can be put in another order with View › Arrange Sections…, also on a heading's right-click menu. Each site keeps its own order.
+- After Publish, the bar at the bottom of the window shows the site's build until it's live, or why it failed, from the checks Cloudflare Pages or Netlify report to GitHub. It uses the GitHub CLI (`gh`) you're signed in to.
+- Publish is a sheet in the same style as the editor, tall enough to read the changes without much scrolling. Each file opens to a word-by-word diff that wraps instead of scrolling sideways, with removed words struck through.
+- Discard Changes… in Publish puts a file back to the last commit. Your version goes to the Trash first.
+- Preview is now Open in Browser (⌥⌘P): the entry opens in your browser from the site's dev server, drafts included, which Canteiro starts if need be. Rich, with your site's look, is the reading view.
+- Rich shows photos. A `![](https://…)` on a line of its own shows as its photo, loaded in the background and kept for the session.
+- Links in Rich no longer leave a gap after them where their address is hidden.
+- Rich can look like your site: a `rich` block in `canteiro.json` gives it the site's fonts, size, line height, reading width and colors, with separate colors for dark mode.
 - The New Aside window's cursor lines up with the hint and starts in the right font, and its language menu no longer opens blank while the site is loading.
 - An inbox folder in `canteiro.json` can be relative to the site, such as `inbox`.
 - A demo site in `demo/` to try Canteiro on, with posts, asides, a podcast, pages and an inbox.

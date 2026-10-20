@@ -35,7 +35,7 @@ import Testing
         let changes = try Git.status(work)
         #expect(changes.map(\.path).sorted() == ["post.yaml", "src/new file.md"])
         #expect(changes.first { $0.path == "src/new file.md" }?.isNew == true)
-        #expect(Git.diff(work, changes.first { $0.path == "post.yaml" }!).contains("+title: Two"))
+        #expect(Git.diff(work, changes.first { $0.path == "post.yaml" }!).contains("+Two"))
         #expect(Git.diff(work, changes.first { $0.path == "src/new file.md" }!).contains("+new"))
     }
 
@@ -73,5 +73,32 @@ import Testing
         try Git.push(work)
         let log = try Subprocess.run(Git.git, ["-C", remote.path, "log", "--format=%s"], timeout: 10).stdoutString
         #expect(log.split(separator: "\n") == ["Edit", "Other", "First"])
+    }
+
+    /// Discarding puts an edit back and removes a new file, and the
+    /// discarded versions go to the trash, never just away.
+    @Test func discardPutsFilesBack() throws {
+        let (work, _) = try repo()
+        try "title: Two\n".write(to: work.appending(path: "post.yaml"), atomically: true, encoding: .utf8)
+        try "new\n".write(to: work.appending(path: "new.md"), atomically: true, encoding: .utf8)
+        var trashed: [String] = []
+        let trash: (URL) throws -> Void = { url in
+            trashed.append(try String(contentsOf: url, encoding: .utf8))
+            try FileManager.default.removeItem(at: url)
+        }
+        for change in try Git.status(work) { try Git.discard(work, change, trash: trash) }
+        #expect(try Git.status(work).isEmpty)
+        #expect(try String(contentsOf: work.appending(path: "post.yaml"), encoding: .utf8) == "title: One\n")
+        #expect(Set(trashed) == ["title: Two\n", "new\n"])
+    }
+}
+
+@Suite struct DiffStyleTests {
+    @Test func wordDiffShowsTheLineOnce() {
+        let porcelain = "diff --git a/p.md b/p.md\n@@ -1 +1 @@\n I also\n-help \n run a space\n-in town\n~\n"
+        let out = DiffStyle.words(porcelain)
+        #expect(String(out.characters) == "I alsohelp run a spacein town")
+        let removed = out.runs.filter { $0.strikethroughStyle != nil }.map { String(out[$0.range].characters) }
+        #expect(removed == ["help ", "in town"])
     }
 }

@@ -4,8 +4,8 @@ import SwiftUI
 struct ContentView: View {
     @Environment(SiteStore.self) private var store
     @Environment(DraftInbox.self) private var inbox
+    @Environment(PreviewServer.self) private var server
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismissWindow) private var dismissWindow
     @State private var showPublish = false
     @AppStorage("bodyMode") private var bodyMode = BodyMode.markdown
 
@@ -20,12 +20,15 @@ struct ContentView: View {
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         // Same text either way; Rich hides the marks.
-                        Picker("Text", selection: $bodyMode) {
+                        Picker("View", selection: $bodyMode) {
                             Text("Markdown").tag(BodyMode.markdown)
                             Text("Rich").tag(BodyMode.rich)
                         }
                         .pickerStyle(.segmented)
-                        .help("Markdown shows the marks; Rich hides them and shows the result (⌘R)")
+                        .help("Markdown shows the marks, Rich hides them (⌘R)")
+                    }
+                    ToolbarItem(placement: .primaryAction) {
+                        OpenInBrowserButton()
                     }
                     ToolbarItem(placement: .primaryAction) {
                         Button {
@@ -37,29 +40,17 @@ struct ContentView: View {
                         .help("Commit and push your changes")
                         .disabled(store.changes.isEmpty)
                     }
-                    ToolbarItem(placement: .primaryAction) {
-                        // The preview has its own window, kept out of this
-                        // one's layout: as a side panel it squeezed the
-                        // sidebar, and as an .inspector it crashed the app.
-                        Toggle(isOn: Binding(
-                            get: { store.previewOpen },
-                            set: { $0 ? openWindow(id: "preview") : dismissWindow(id: "preview") }
-                        )) {
-                            Label("Preview", systemImage: "eye")
-                        }
-                        .help("Show the page as the site renders it, drafts included, in its own window")
-                        .keyboardShortcut("p", modifiers: [.command, .option])
-                        .disabled(store.phase != .ready)
-                    }
                 }
         }
         .navigationTitle(store.siteName)
         .sheet(isPresented: $showPublish) { PublishSheet() }
         .sheet(item: $store.newEntryItem) { NewEntrySheet(item: $0) }
+        .sheet(isPresented: $store.arrangingSections) { ArrangeSectionsSheet() }
         .onReceive(NotificationCenter.default.publisher(for: AsideHotKey.pressed)) { _ in
             NSApp.activate()
             openWindow(id: "aside")
         }
+        .onChange(of: store.siteURL) { server.siteChanged(store.siteURL) }
         .onChange(of: store.config, initial: true) { inbox.configure(store.config, site: store.siteURL) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Catch commits and edits made outside the app.
@@ -113,22 +104,27 @@ struct SidebarView: View {
     var body: some View {
         @Bindable var store = store
         List(selection: $store.selectedItem) {
-            if let schema = store.schema {
-                ForEach(schema.groups, id: \.name) { group in
-                    Section(group.name) {
+            ForEach(Self.sections(store, inbox), id: \.self) { name in
+                if name == DraftInbox.sidebarKey {
+                    if let folder = inbox.folder {
+                        Section {
+                            Label(folder.lastPathComponent, systemImage: "tray")
+                                .badge(inbox.drafts.count)
+                                .tag(DraftInbox.sidebarKey)
+                        } header: {
+                            header("Inbox")
+                        }
+                    }
+                } else if let group = store.schema?.groups.first(where: { $0.name == name }) {
+                    Section {
                         ForEach(group.items) { item in
                             Label(item.label, systemImage: Self.icon(for: item))
                                 .badge(store.count(item) ?? 0)
                                 .tag(item.key)
                         }
+                    } header: {
+                        header(group.name)
                     }
-                }
-            }
-            if let folder = inbox.folder, let key = inbox.collection, store.schema?.item(key) != nil {
-                Section("Inbox") {
-                    Label(folder.lastPathComponent, systemImage: "tray")
-                        .badge(inbox.drafts.count)
-                        .tag(DraftInbox.sidebarKey)
                 }
             }
             if !store.problems.isEmpty {
@@ -141,6 +137,27 @@ struct SidebarView: View {
                 }
             }
         }
+    }
+
+    private func header(_ title: String) -> some View {
+        Text(title)
+            .contextMenu {
+                Button("Arrange Sections…") { store.arrangingSections = true }
+            }
+    }
+
+    /// The sections in the config's order: its groups, then the inbox.
+    static func defaultSections(_ store: SiteStore, _ inbox: DraftInbox) -> [String] {
+        var names = store.schema?.groups.map(\.name) ?? []
+        if inbox.folder != nil, let key = inbox.collection, store.schema?.item(key) != nil {
+            names.append(DraftInbox.sidebarKey)
+        }
+        return names
+    }
+
+    /// The sections in this site's order, if they've been arranged.
+    static func sections(_ store: SiteStore, _ inbox: DraftInbox) -> [String] {
+        SiteStore.arranged(defaultSections(store, inbox), by: store.sectionOrder)
     }
 
     /// An icon from what the item holds, so a new collection gets a fair
@@ -157,5 +174,93 @@ struct SidebarView: View {
         }
         if item.path.hasSuffix("**") { return "books.vertical" }
         return item.dateField != nil ? "doc.text" : "doc"
+    }
+}
+
+
+/// View › Arrange Sections…: the sidebar's sections in a list to drag into
+/// order. Saved per site on this Mac.
+struct ArrangeSectionsSheet: View {
+    @Environment(SiteStore.self) private var store
+    @Environment(DraftInbox.self) private var inbox
+    @Environment(\.dismiss) private var dismiss
+    @State private var order: [String] = []
+
+    var body: some View {
+        let standard = SidebarView.defaultSections(store, inbox)
+        VStack(spacing: 0) {
+            Form {
+                Section {
+                    List {
+                        ForEach(order, id: \.self) { name in
+                            Label(title(name), systemImage: "line.3.horizontal")
+                        }
+                        .onMove { order.move(fromOffsets: $0, toOffset: $1) }
+                    }
+                    .frame(height: CGFloat(order.count) * 28 + 12)
+                } header: {
+                    Text("Arrange Sections")
+                } footer: {
+                    Text("Drag sections into the order the sidebar shows them.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .formStyle(.grouped)
+            .scrollDisabled(true)
+            HStack {
+                Button("Restore Default Order") { order = standard }
+                    .disabled(order == standard)
+                Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Done") {
+                    store.arrangeSections(order == standard ? [] : order)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+            .padding([.horizontal, .bottom], 20)
+        }
+        .frame(width: 380)
+        .fixedSize(horizontal: false, vertical: true)
+        .onAppear { order = SidebarView.sections(store, inbox) }
+    }
+
+    private func title(_ name: String) -> String {
+        name == DraftInbox.sidebarKey ? "Inbox" : name
+    }
+}
+
+/// Opens what's selected in the browser, from the site's dev server, which
+/// it starts if need be. Edits are saved first, so the page has them.
+struct OpenInBrowserButton: View {
+    @Environment(SiteStore.self) private var store
+    @Environment(PreviewServer.self) private var server
+    @FocusedValue(\.saveEntry) private var saveEntry
+    var inMenu = false
+
+    var body: some View {
+        Button {
+            guard let path = store.previewPath, let site = store.siteURL else { return }
+            saveEntry?()
+            Task {
+                do {
+                    try await server.open(path, site: site)
+                } catch {
+                    store.lastError = error.localizedDescription
+                }
+            }
+        } label: {
+            if inMenu {
+                Text("Open in Browser")
+            } else if server.isStarting {
+                ProgressView().controlSize(.small)
+            } else {
+                Label("Open in Browser", systemImage: "safari")
+            }
+        }
+        .keyboardShortcut(inMenu ? KeyboardShortcut("p", modifiers: [.command, .option]) : nil)
+        .help(server.state == .starting ? "Starting astro dev…" : "Open this page from the site's dev server, drafts included (⌥⌘P)")
+        .disabled(store.previewPath == nil || server.isStarting)
     }
 }

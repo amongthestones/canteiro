@@ -1,9 +1,10 @@
-import Foundation
+import AppKit
 import Observation
 
-/// The site's `astro dev` server, which renders drafts with a Draft banner.
-/// Uses one that's already running for this site (a terminal's, another tool's), or
-/// starts its own and stops it when Canteiro quits.
+/// The site's `astro dev` server, for opening entries in the browser; it
+/// renders drafts with a Draft banner. Uses one that's already running for
+/// this site (a terminal's, another tool's), or starts its own and stops it
+/// when Canteiro quits or another site opens.
 @MainActor
 @Observable
 final class PreviewServer {
@@ -13,7 +14,6 @@ final class PreviewServer {
         case off
         case starting
         case running(URL)
-        case failed(String)
     }
 
     private(set) var state: State = .idle
@@ -25,54 +25,76 @@ final class PreviewServer {
         return nil
     }
 
-    /// Looks for a dev server already serving this site.
-    func find(for site: URL) {
-        guard site != self.site || state == .idle || state == .off else { return }
-        if site != self.site { stop() }
-        self.site = site
-        state = .looking
-        Task {
-            let port = await Task.detached { DevServerScan.port(servingSite: site) }.value
-            guard self.site == site else { return }
-            state = port.map { .running(URL(string: "http://localhost:\($0)")!) } ?? .off
-        }
+    var isStarting: Bool { state == .looking || state == .starting }
+
+    /// Opens a page of the site in the browser, from a dev server already
+    /// running for it or one started for the purpose.
+    func open(_ path: String, site: URL) async throws {
+        guard let base = try await running(for: site) else { return }
+        NSWorkspace.shared.open(base.appending(path: path))
     }
 
-    func start() {
-        guard let site, process == nil else { return }
+    /// Stops a server Canteiro started for another site.
+    func siteChanged(_ site: URL?) {
+        guard site != self.site else { return }
+        stop()
+        self.site = site
+        state = .idle
+    }
+
+    private func running(for site: URL) async throws -> URL? {
+        siteChanged(site)
+        if let baseURL, await Self.responds(baseURL) { return baseURL }
+        guard !isStarting else { return nil }
+        state = .looking
+        if let port = await Task.detached(operation: { DevServerScan.port(servingSite: site) }).value {
+            state = .running(URL(string: "http://localhost:\(port)")!)
+            return baseURL
+        }
+        try await start(site)
+        return baseURL
+    }
+
+    private func start(_ site: URL) async throws {
         state = .starting
-        Task {
-            guard let node = await Task.detached(operation: { NodeLocator.path() }).value else {
-                state = .failed(SchemaLoader.Failure.noNode.localizedDescription)
+        guard let node = await Task.detached(operation: { NodeLocator.path() }).value else {
+            state = .off
+            throw SchemaLoader.Failure.noNode
+        }
+        let port = await Task.detached { DevServerScan.freePort() }.value
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: node)
+        task.arguments = [site.appending(path: "node_modules/astro/astro.js").path, "dev", "--port", String(port)]
+        task.currentDirectoryURL = site
+        task.standardInput = FileHandle.nullDevice
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        do {
+            try task.run()
+        } catch {
+            state = .off
+            throw error
+        }
+        process = task
+        let url = URL(string: "http://localhost:\(port)")!
+        // Astro takes a few seconds to come up.
+        for _ in 0..<80 {
+            if await Self.responds(url) {
+                state = .running(url)
                 return
             }
-            let port = await Task.detached { DevServerScan.freePort() }.value
-            let task = Process()
-            task.executableURL = URL(fileURLWithPath: node)
-            task.arguments = [site.appending(path: "node_modules/astro/astro.js").path, "dev", "--port", String(port)]
-            task.currentDirectoryURL = site
-            task.standardInput = FileHandle.nullDevice
-            task.standardOutput = FileHandle.nullDevice
-            task.standardError = FileHandle.nullDevice
-            do {
-                try task.run()
-            } catch {
-                state = .failed(error.localizedDescription)
-                return
-            }
-            process = task
-            let url = URL(string: "http://localhost:\(port)")!
-            // Astro takes a few seconds to come up.
-            for _ in 0..<80 {
-                if await Self.responds(url) {
-                    state = .running(url)
-                    return
-                }
-                guard task.isRunning else { break }
-                try? await Task.sleep(for: .milliseconds(500))
-            }
-            stop()
-            state = .failed("astro dev didn't start. Try npm run dev in the site folder to see why.")
+            guard task.isRunning else { break }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        stop()
+        state = .off
+        throw Failure.didNotStart
+    }
+
+    enum Failure: LocalizedError {
+        case didNotStart
+        var errorDescription: String? {
+            "astro dev didn't start. Try npm run dev in the site folder to see why."
         }
     }
 
@@ -80,6 +102,7 @@ final class PreviewServer {
     func stop() {
         process?.terminate()
         process = nil
+        if case .running = state { state = .idle }
     }
 
     private static func responds(_ url: URL) async -> Bool {

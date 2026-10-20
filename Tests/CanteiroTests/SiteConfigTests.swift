@@ -67,4 +67,35 @@ import Testing
         MarkdownStyler.style(s, mode: .rich, syntax: [.highlight])
         #expect(s.attributes(at: 2, effectiveRange: nil)[.backgroundColor] != nil)
     }
+    @MainActor @Test func richTakesTheSitesLook() throws {
+        let url = try site(#"""
+        {"rich": {"body": "Helvetica", "size": 18, "lineHeight": 1.5, "headingSizes": [2, 1.5],
+                  "colors": {"text": "#222", "links": "#111"}, "fonts": ["fonts/*.woff2"]}}
+        """#)
+        let look = RichLook(try SiteConfig.load(site: url).rich!, site: url)
+        #expect(look.body.familyName == "Helvetica" && look.body.pointSize == 18)
+        #expect(look.lineHeight == 27)
+        #expect(look.headingFont(level: 2).pointSize == 27)
+        #expect(look.problems == ["canteiro.json: rich: no font file at fonts/*.woff2"])
+
+        let s = NSTextStorage(string: "## Head\n\nBody with a [link](https://x.y).\n")
+        MarkdownStyler.style(s, mode: .rich, look: look)
+        let body = s.attributes(at: (s.string as NSString).range(of: "Body").location, effectiveRange: nil)
+        #expect((body[.font] as? NSFont)?.familyName == "Helvetica")
+        #expect((body[.paragraphStyle] as? NSParagraphStyle)?.minimumLineHeight == 27)
+        var red: CGFloat = 0
+        NSAppearance(named: .aqua)!.performAsCurrentDrawingAppearance {
+            red = (body[.foregroundColor] as? NSColor)?.usingColorSpace(.sRGB)?.redComponent ?? 0
+        }
+        #expect(abs(red - 0x22 / 255) < 0.001)
+        MarkdownStyler.style(s, mode: .markdown, look: look)
+        #expect((s.attributes(at: 9, effectiveRange: nil)[.font] as? NSFont)?.isFixedPitch == true, "Markdown keeps its own look")
+    }
+
+    @Test func richListsWhatItCantUse() throws {
+        let url = try site(#"{"rich": {"body": "No Such Font", "colors": {"text": "red"}}}"#)
+        let look = RichLook(try SiteConfig.load(site: url).rich!, site: url)
+        #expect(look.body.pointSize == 15)
+        #expect(look.problems.count == 2)
+    }
 }

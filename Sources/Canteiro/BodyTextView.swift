@@ -14,6 +14,8 @@ struct BodyTextView: NSViewRepresentable {
     var mode: BodyMode = .markdown
     /// The site's markdown extras to style, from canteiro.json.
     var syntax: Set<SiteConfig.Syntax> = []
+    /// The site's type and colors for Rich, from canteiro.json.
+    var look: RichLook = .standard
     var minHeight: CGFloat = 320
     /// Turns a dropped photo into the markdown to insert (`![](https://…)`).
     var uploadPhoto: (@MainActor (URL) async throws -> String)?
@@ -50,6 +52,7 @@ struct BodyTextView: NSViewRepresentable {
     func updateNSView(_ view: BodyNSTextView, context: Context) {
         let coordinator = context.coordinator
         let modeChanged = coordinator.parent.mode != mode || coordinator.parent.syntax != syntax
+            || coordinator.parent.look != look
         coordinator.parent = self
         view.syntax = syntax
         if view.string != text {
@@ -75,15 +78,28 @@ struct BodyTextView: NSViewRepresentable {
         /// The last measurement. SwiftUI asks for the same size many times.
         private var measured: (text: String, mode: BodyMode, width: CGFloat, height: CGFloat)?
 
-        init(_ parent: BodyTextView) { self.parent = parent }
+        init(_ parent: BodyTextView) {
+            self.parent = parent
+            super.init()
+            NotificationCenter.default.addObserver(self, selector: #selector(imageLoaded), name: InlineImages.loaded, object: nil)
+        }
+
+        /// A photo arrived: make room for it, and have SwiftUI measure again.
+        @objc private func imageLoaded(_ note: Notification) {
+            guard parent.mode == .rich, let url = note.object as? String, view?.string.contains(url) == true else { return }
+            restyle()
+            view?.invalidateIntrinsicContentSize()
+        }
 
         func restyle() {
             guard let view, let storage = view.textStorage else { return }
-            MarkdownStyler.style(storage, mode: parent.mode, syntax: parent.syntax)
-            view.typingAttributes = MarkdownStyler.baseAttributes(parent.mode)
+            let images = parent.mode == .rich ? InlineImages.shared.sizes(MarkdownStyler.imageURLs(in: storage.string)) : [:]
+            MarkdownStyler.style(storage, mode: parent.mode, syntax: parent.syntax, look: parent.look, images: images)
+            view.typingAttributes = MarkdownStyler.baseAttributes(parent.mode, parent.look)
             measured = nil
-            // A grid moves with its table, and TextKit only redraws the text.
-            if parent.mode == .rich, storage.string.contains("|") { view.needsDisplay = true }
+            // Grids and photos move with their text, and TextKit only
+            // redraws the text.
+            if parent.mode == .rich, storage.string.contains("|") || !images.isEmpty { view.needsDisplay = true }
         }
 
         func height(of storage: NSTextStorage, width: CGFloat) -> CGFloat {
@@ -95,7 +111,7 @@ struct BodyTextView: NSViewRepresentable {
                                         options: [.usesLineFragmentOrigin, .usesFontLeading])
             // One spare line, so a trailing newline has room and the caret
             // never sits on the bottom edge.
-            let line = MarkdownStyler.baseFont(parent.mode).boundingRectForFont.height
+            let line = MarkdownStyler.baseFont(parent.mode, parent.look).boundingRectForFont.height
             let height = ceil(box.height + line + 8)
             measured = (storage.string, parent.mode, width, height)
             return height
@@ -161,6 +177,28 @@ final class BodyNSTextView: NSTextView {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         drawTableGrids(in: dirtyRect)
+        drawImages(in: dirtyRect)
+    }
+
+    /// Each loaded photo in the room MarkdownStyler left above its line,
+    /// narrower if the column is.
+    private func drawImages(in dirtyRect: NSRect) {
+        guard let storage = textStorage, let layout = textLayoutManager,
+              let content = layout.textContentManager, let container = textContainer else { return }
+        let origin = textContainerOrigin
+        storage.enumerateAttribute(.inlineImage, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
+            guard let photo = value as? InlineImage, let image = InlineImages.shared.image(photo.url),
+                  let start = content.location(content.documentRange.location, offsetBy: range.location),
+                  let fragment = layout.textLayoutFragment(for: start),
+                  let line = fragment.textLineFragments.first else { return }
+            let scale = min(1, container.size.width / photo.size.width)
+            let size = NSSize(width: photo.size.width * scale, height: photo.size.height * scale)
+            // Just above the hidden line.
+            let bottom = fragment.layoutFragmentFrame.minY + line.typographicBounds.maxY - MarkdownStyler.imageLine
+            let rect = NSRect(x: origin.x, y: origin.y + bottom - size.height, width: size.width, height: size.height)
+            guard rect.intersects(dirtyRect) else { return }
+            image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
+        }
     }
 
     /// Hairlines around and between the cells of each row MarkdownStyler

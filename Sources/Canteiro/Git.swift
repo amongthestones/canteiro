@@ -39,12 +39,43 @@ enum Git {
         try? run(site, ["rev-parse", "--abbrev-ref", "HEAD"]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// The change as a diff. A new file shows as all added lines.
+    /// The last commit's full hash.
+    static func head(_ site: URL) -> String? {
+        try? run(site, ["rev-parse", "HEAD"]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Where Publish pushes to.
+    static func remoteURL(_ site: URL) -> String? {
+        try? run(site, ["remote", "get-url", "origin"]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The change as a word diff (`--word-diff=porcelain`), which reads
+    /// better than whole lines for prose. A new file shows as all added.
     static func diff(_ site: URL, _ change: GitChange) -> String {
         if change.code == "??" {
-            return (try? run(site, ["diff", "--no-index", "--", "/dev/null", change.path], allowFailure: true)) ?? ""
+            return (try? run(site, ["diff", "--word-diff=porcelain", "--no-index", "--", "/dev/null", change.path], allowFailure: true)) ?? ""
         }
-        return (try? run(site, ["diff", "HEAD", "--", change.path])) ?? ""
+        return (try? run(site, ["diff", "--word-diff=porcelain", "HEAD", "--", change.path])) ?? ""
+    }
+
+    /// Whether the last commit has this file.
+    static func isCommitted(_ site: URL, _ path: String) -> Bool {
+        (try? run(site, ["cat-file", "-e", "HEAD:" + path])) != nil
+    }
+
+    /// Puts a file back as the last commit has it, after moving the version
+    /// on disk to the Trash. A file the last commit doesn't have just goes
+    /// to the Trash.
+    static func discard(_ site: URL, _ change: GitChange,
+                        trash: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) throws {
+        let file = site.appending(path: change.path)
+        let committed = isCommitted(site, change.path)
+        if FileManager.default.fileExists(atPath: file.path) { try trash(file) }
+        if committed {
+            try run(site, ["restore", "--source=HEAD", "--staged", "--worktree", "--", change.path])
+        } else {
+            try run(site, ["rm", "--cached", "--quiet", "--ignore-unmatch", "--", change.path])
+        }
     }
 
     /// Commits exactly these paths (nothing else that's staged) and pushes.

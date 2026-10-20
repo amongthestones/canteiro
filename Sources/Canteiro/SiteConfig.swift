@@ -55,10 +55,41 @@ struct SiteConfig: Codable, Sendable, Equatable {
         case toc
     }
 
+    /// The site's type and colors, for the Rich view.
+    struct Rich: Codable, Sendable, Equatable {
+        /// Font files, relative to the site. `*` matches in the file name.
+        var fonts: [String]?
+        /// Font family names.
+        var body: String?
+        var headings: String?
+        /// The body size in points, and the line height as a multiple of it.
+        var size: Double?
+        var lineHeight: Double?
+        /// h1 to h6, in multiples of the body size.
+        var headingSizes: [Double]?
+        /// The reading column, in points.
+        var width: Double?
+        var colors: Colors?
+        /// Colors for dark mode. Without them, dark mode keeps the app's.
+        var dark: Colors?
+
+        /// Hex colors, like `#222` or `#1c1914`.
+        struct Colors: Codable, Sendable, Equatable {
+            var text: String?
+            var headings: String?
+            var links: String?
+            var background: String?
+        }
+    }
+
     var inbox: Inbox?
     var uploads: Uploads?
     var podcasts: Podcasts?
     var syntax: Set<Syntax>?
+    var rich: Rich?
+    /// The site's `_redirects` file, relative to the site. Renaming a
+    /// published entry adds a redirect from its old address there.
+    var redirects: String?
 
     /// The site's file, or the empty config when there isn't one. A file
     /// that doesn't parse throws, so the problem can be shown.

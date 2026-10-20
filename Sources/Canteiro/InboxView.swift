@@ -5,6 +5,7 @@ import SwiftUI
 /// entry.
 struct InboxView: View {
     @Environment(SiteStore.self) private var store
+    @AppStorage("bodyMode") private var bodyMode = BodyMode.markdown
     @Environment(DraftInbox.self) private var inbox
     @AppStorage("listWidth") private var listWidth = 320.0
     @State private var error: String?
@@ -132,13 +133,15 @@ struct DraftEditor: View {
 
     var body: some View {
         ScrollView {
-            BodyTextView(text: $text, mode: bodyMode, syntax: store.config.extras, uploadPhoto: EntryEditor.photoUploader(store),
-                         onError: { store.lastError = $0 })
+            BodyTextView(text: $text, mode: bodyMode, syntax: store.config.extras, look: store.richLook,
+                         uploadPhoto: EntryEditor.photoUploader(store), onError: { store.lastError = $0 })
+                .frame(maxWidth: bodyMode == .rich ? store.richLook.width : nil, alignment: .leading)
                 .padding(.horizontal, 32)
                 .padding(.vertical, 18)
                 .frame(maxWidth: 820, alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .background(bodyMode == .rich ? store.richLook.background.map(Color.init(nsColor:)) : nil)
         .safeAreaInset(edge: .top, spacing: 0) { banner }
         .onAppear {
             text = inbox.open(draft.url)

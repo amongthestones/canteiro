@@ -42,15 +42,18 @@ Keystatic's `itemLabel` functions can't be read from the config, so lists use th
 | `FileWriter.swift` | Writes entries back with the smallest change |
 | `ContentView.swift`, `CollectionView.swift` | The sidebar, lists and layout |
 | `EntryEditor.swift`, `FieldControl.swift`, `SettingsForm.swift` | Forms and field controls |
+| `SlugField.swift`, `Renamer.swift` | The slug field, renaming an entry and its redirect |
 | `AssetField.swift` | Image and file fields, and where their files go |
 | `BodyTextView.swift`, `MarkdownStyler.swift` | The body editor and its Markdown and Rich views |
+| `RichLook.swift`, `InlineImages.swift` | Rich's look from `canteiro.json`, and the photos it shows |
 | `FormatCommands.swift`, `MarkdownFormat.swift` | The Format menu and the edits it makes |
 | `Autosave.swift` | Saving and the changed-on-disk bar |
 | `DraftInbox.swift`, `InboxView.swift` | The inbox |
 | `QuickAside.swift` | The aside window and its global shortcut |
 | `PhotoProcessor.swift`, `R2.swift` | Photos, R2 and the keychain |
-| `PreviewServer.swift`, `PreviewPane.swift` | `astro dev` and the preview window |
+| `PreviewServer.swift` | `astro dev`, for Open in Browser |
 | `Git.swift`, `PublishSheet.swift` | Changes, diffs, commit and push |
+| `BuildWatch.swift` | The build after a push, from GitHub's checks |
 | `ListFilter.swift`, `ListSort.swift`, `NewEntry.swift` | The list filter, the list order and new entries |
 | `Subprocess.swift` | Running Node, git and `cwebp` |
 

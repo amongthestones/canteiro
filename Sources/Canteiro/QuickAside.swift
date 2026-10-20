@@ -157,7 +157,7 @@ struct UploadBar: View {
     @Environment(SiteStore.self) private var store
 
     var body: some View {
-        if !store.uploads.isEmpty || store.lastError != nil {
+        if !store.uploads.isEmpty || store.lastError != nil || store.build.state != .idle {
             VStack(spacing: 0) {
                 Divider()
                 VStack(alignment: .leading, spacing: 6) {
@@ -169,6 +169,7 @@ struct UploadBar: View {
                             Text("\(Int(upload.progress * 100))%").monospacedDigit().foregroundStyle(.secondary)
                         }
                     }
+                    BuildRow(build: store.build)
                     if let error = store.lastError {
                         HStack(spacing: 10) {
                             Image(systemName: "xmark.octagon.fill").foregroundStyle(.red)
@@ -183,6 +184,51 @@ struct UploadBar: View {
                 .padding(.vertical, 8)
             }
             .background(.bar)
+        }
+    }
+}
+
+/// The build after a push: building, then live or failed, with a link to
+/// the host's page for it. Live goes away on its own after a while.
+private struct BuildRow: View {
+    let build: BuildWatch
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        switch build.state {
+        case .idle:
+            EmptyView()
+        case .building(let name, let url):
+            row {
+                ProgressView().controlSize(.small)
+                Text(name.map { "\($0) is building the site…" } ?? "Waiting for the build to start…")
+            } url: { url }
+        case .live(let name, let url):
+            row {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Text("Live. \(name) finished building the site.")
+            } url: { url }
+            .task {
+                try? await Task.sleep(for: .seconds(30))
+                build.dismiss()
+            }
+        case .failed(let name, let detail, let url):
+            row {
+                Image(systemName: "xmark.octagon.fill").foregroundStyle(.red)
+                Text("\(name) couldn't build the site\(detail.map { ": \($0)" } ?? ".")").lineLimit(2)
+            } url: { url }
+        }
+    }
+
+    private func row(@ViewBuilder _ content: () -> some View, url: () -> URL?) -> some View {
+        let link = url()
+        return HStack(spacing: 10) {
+            content()
+            Spacer()
+            if let link {
+                Button("Show Log") { openURL(link) }.controlSize(.small)
+            }
+            Button("Dismiss") { build.dismiss() }.controlSize(.small)
         }
     }
 }

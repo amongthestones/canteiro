@@ -63,7 +63,9 @@ struct EntryEditor: View {
                     Divider()
                 }
                 if item.bodyField != nil {
-                    BodyTextView(text: $text, mode: bodyMode, syntax: store.config.extras, uploadPhoto: uploadPhoto, onError: { store.lastError = $0 })
+                    BodyTextView(text: $text, mode: bodyMode, syntax: store.config.extras, look: store.richLook,
+                                 uploadPhoto: uploadPhoto, onError: { store.lastError = $0 })
+                        .frame(maxWidth: bodyMode == .rich ? store.richLook.width : nil, alignment: .leading)
                         .padding(.top, 18)
                 }
             }
@@ -72,7 +74,17 @@ struct EntryEditor: View {
             .frame(maxWidth: 820, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .background(bodyMode == .rich ? store.richLook.background.map(Color.init(nsColor:)) : nil)
         .environment(\.guidField, store.isEpisodes(item) ? store.config.guidField : nil)
+        .environment(\.entryRename, item.kind == .collection ? EntryRename(
+            slug: entry.slug,
+            check: { store.renameCheck(item, id: entry.id, to: $0) },
+            perform: { typed in
+                // Edits so far go with it.
+                store.save(item, id: entry.id, data: data, body: item.bodyField == nil ? nil : lead + text)
+                try store.rename(item, id: entry.id, to: typed)
+            }
+        ) : nil)
         .environment(\.assetPlace, store.siteURL.map { AssetPlace(site: $0, item: item, slug: entry.slug) })
         .autosave(item, id: entry.id, data: data, body: item.bodyField == nil ? nil : lead + text)
     }
@@ -96,6 +108,7 @@ extension EntryEditor {
 /// header of a Mail message.
 struct FieldRows: View {
     @Environment(\.fieldPath) private var path
+    @Environment(\.entryRename) private var rename
     let fields: [FieldSpec]
     @Binding var data: FieldValue
     var slug: String?
@@ -113,6 +126,19 @@ struct FieldRows: View {
                 }
                 .padding(.vertical, 8)
                 Divider()
+                // The slug gets its own row under the title it came from.
+                if field.type == "slug", let rename {
+                    GridRow {
+                        Text(field.slug?.label ?? "Slug")
+                            .foregroundStyle(.secondary)
+                            .frame(minWidth: 96, alignment: .leading)
+                        SlugField(spec: field, rename: rename)
+                            .id(rename.slug)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.vertical, 8)
+                    Divider()
+                }
             }
         }
     }

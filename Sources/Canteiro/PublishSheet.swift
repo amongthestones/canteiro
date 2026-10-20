@@ -16,43 +16,61 @@ struct PublishSheet: View {
     }
 
     @State private var picked: Set<String> = []
-    @State private var selected: GitChange.ID?
+    @State private var expanded: Set<String> = []
+    @State private var diffs: [String: AttributedString] = [:]
+    @State private var discarding: GitChange?
     @State private var message = ""
-    @State private var diff = ""
     @State private var phase: Phase = .ready
     @State private var branch = "main"
 
     private var changes: [GitChange] { store.changes }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Publish").font(.title2.bold())
-                Text("Commits to \(branch) and pushes to GitHub. Cloudflare Pages builds the site from the push.")
-                    .foregroundStyle(.secondary)
-            }
-
+        VStack(spacing: 0) {
             if phase == .pushed {
                 done
             } else {
-                files
-                TextField("Message", text: $message, prompt: Text("What changed"))
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(isWorking)
+                Form {
+                    Section {
+                        ForEach(changes) { row($0) }
+                    } header: {
+                        Text("Changes")
+                    } footer: {
+                        Text("Commits the ticked files to \(branch) and pushes to GitHub. Cloudflare Pages builds the site from the push.")
+                            .foregroundStyle(.secondary)
+                    }
+                    Section {
+                        TextField("Message", text: $message, prompt: Text("What changed"))
+                    }
+                }
+                .formStyle(.grouped)
+                .disabled(isWorking)
+                Divider()
                 footer
             }
         }
-        .padding(20)
-        .frame(width: 860)
+        .frame(width: 680)
+        .frame(minHeight: phase == .pushed ? 0 : 520, idealHeight: phase == .pushed ? nil : 820)
         .task {
             if let site = store.siteURL { branch = await Task.detached { Git.branch(site) ?? "main" }.value }
             picked = Set(store.contentChanges.map(\.id))
-            selected = changes.first { picked.contains($0.id) }?.id ?? changes.first?.id
+            if let first = changes.first(where: { picked.contains($0.id) }) ?? changes.first { expanded = [first.id] }
             message = suggestedMessage()
         }
-        .task(id: selected) {
-            guard let site = store.siteURL, let change = changes.first(where: { $0.id == selected }) else { diff = ""; return }
-            diff = await Task.detached { Git.diff(site, change) }.value
+        .task(id: expanded) { await loadDiffs() }
+        .onChange(of: changes) {
+            // A discarded file leaves the list.
+            picked.formIntersection(changes.map(\.id))
+            diffs = [:]
+            Task { await loadDiffs() }
+        }
+        .confirmationDialog(discardTitle, isPresented: Binding(get: { discarding != nil }, set: { if !$0 { discarding = nil } }),
+                            presenting: discarding) { change in
+            Button("Discard", role: .destructive) { Task { await store.discard(change) } }
+        } message: { change in
+            Text(change.isNew && change.code == "??"
+                 ? "It isn't published yet, so the whole file goes to the Trash."
+                 : "It goes back to the published version. Your version goes to the Trash.")
         }
     }
 
@@ -61,48 +79,80 @@ struct PublishSheet: View {
         return false
     }
 
-    private var files: some View {
-        HStack(spacing: 0) {
-            List(selection: $selected) {
-                ForEach(changes) { change in
-                    HStack(spacing: 8) {
-                        Toggle(isOn: Binding(
-                            get: { picked.contains(change.id) },
-                            set: { if $0 { picked.insert(change.id) } else { picked.remove(change.id) } }
-                        )) { EmptyView() }
-                        .toggleStyle(.checkbox)
-                        .labelsHidden()
-                        StatusBadge(change: change)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(store.title(forPath: change.path) ?? URL(fileURLWithPath: change.path).lastPathComponent)
-                                .lineLimit(1)
-                            Text(change.path)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        }
-                    }
-                    .tag(change.id)
-                }
+    private func name(_ change: GitChange) -> String {
+        store.title(forPath: change.path) ?? URL(fileURLWithPath: change.path).lastPathComponent
+    }
+
+    private var discardTitle: String {
+        discarding.map { "Discard the changes to \(name($0))?" } ?? ""
+    }
+
+    /// A file: ticked to publish, opened to see what changed. The whole
+    /// row opens it, with the chevron on the trailing edge.
+    @ViewBuilder
+    private func row(_ change: GitChange) -> some View {
+        let open = expanded.contains(change.id)
+        HStack(spacing: 8) {
+            Toggle(isOn: Binding(
+                get: { picked.contains(change.id) },
+                set: { if $0 { picked.insert(change.id) } else { picked.remove(change.id) } }
+            )) { EmptyView() }
+            .toggleStyle(.checkbox)
+            .labelsHidden()
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name(change)).lineLimit(1)
+                Text(change.path)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
-            .frame(width: 320)
-            .disabled(isWorking)
-
-            Divider()
-
-            ScrollView([.vertical, .horizontal]) {
-                Text(DiffStyle.attributed(diff))
-                    .font(.system(size: 12, design: .monospaced))
+            Spacer(minLength: 12)
+            Text(change.isNew ? "New" : change.isDeleted ? "Deleted" : "Edited")
+                .foregroundStyle(.secondary)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .rotationEffect(.degrees(open ? 90 : 0))
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.snappy(duration: 0.2)) {
+                if open { expanded.remove(change.id) } else { expanded.insert(change.id) }
+            }
+        }
+        .accessibilityAction(named: open ? "Hide Changes" : "Show Changes") {
+            if open { expanded.remove(change.id) } else { expanded.insert(change.id) }
+        }
+        if open {
+            VStack(alignment: .leading, spacing: 10) {
+                let diff = Text(diffs[change.id] ?? AttributedString("…"))
+                    .font(Self.isProse(change.path) ? .body : .system(size: 12, design: .monospaced))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .padding(12)
+                // As tall as the diff, scrolling past 420 points.
+                ViewThatFits(in: .vertical) {
+                    diff.fixedSize(horizontal: false, vertical: true)
+                    ScrollView { diff }
+                }
+                .frame(maxHeight: 420)
+                Button("Discard Changes…", role: .destructive) { discarding = change }
+                    .controlSize(.small)
             }
-            .background(.background)
+            .padding(.vertical, 4)
         }
-        .frame(height: 360)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator))
+    }
+
+    private func loadDiffs() async {
+        guard let site = store.siteURL else { return }
+        for change in changes where expanded.contains(change.id) && diffs[change.id] == nil {
+            let text = await Task.detached { Git.diff(site, change) }.value
+            diffs[change.id] = DiffStyle.words(text)
+        }
+    }
+
+    static func isProse(_ path: String) -> Bool {
+        ["md", "mdx", "mdoc", "markdown", "txt"].contains(URL(fileURLWithPath: path).pathExtension.lowercased())
     }
 
     @ViewBuilder
@@ -135,6 +185,7 @@ struct PublishSheet: View {
                     .disabled(picked.isEmpty || message.trimmingCharacters(in: .whitespaces).isEmpty || isWorking)
             }
         }
+        .padding(16)
     }
 
     private var done: some View {
@@ -142,12 +193,16 @@ struct PublishSheet: View {
             Image(systemName: "checkmark.circle.fill").font(.largeTitle).foregroundStyle(.green)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Pushed to \(branch)").font(.headline)
-                Text("Cloudflare Pages is building the site.").foregroundStyle(.secondary)
+                Text(BuildWatch.ghPath() == nil
+                     ? "Your host builds the site from the push."
+                     : "Your host builds the site from the push. How it's going shows at the bottom of the window.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
         }
-        .padding(.vertical, 8)
+        .padding(20)
     }
 
     private func publish() {
@@ -177,6 +232,7 @@ struct PublishSheet: View {
                     try Git.push(site)
                 }.value
                 phase = .pushed
+                store.build.watch(site: site)
             } catch {
                 let text = error.localizedDescription
                 let behind = text.contains("fetch first") || text.contains("non-fast-forward") || text.contains("rejected")
@@ -200,41 +256,43 @@ struct PublishSheet: View {
     }
 }
 
-private struct StatusBadge: View {
-    let change: GitChange
-
-    var body: some View {
-        let (letter, color): (String, Color) = change.isNew ? ("A", .green) : change.isDeleted ? ("D", .red) : ("M", .orange)
-        Text(letter)
-            .font(.caption2.bold())
-            .foregroundStyle(.white)
-            .frame(width: 16, height: 16)
-            .background(color, in: RoundedRectangle(cornerRadius: 4))
-            .accessibilityLabel(change.isNew ? "New" : change.isDeleted ? "Deleted" : "Changed")
-    }
-}
-
-/// Colors a unified diff: added lines green, removed red, hunks faded.
+/// Colors a word diff (`git diff --word-diff=porcelain`): the changed
+/// lines once, removed words struck through in red, added ones in green.
 enum DiffStyle {
-    static func attributed(_ diff: String) -> AttributedString {
-        guard !diff.isEmpty else { return AttributedString("No changes to show.") }
+    static func words(_ diff: String) -> AttributedString {
         var out = AttributedString()
+        var hunks = 0
         for line in diff.split(separator: "\n", omittingEmptySubsequences: false) {
-            // The header (diff --git, index, ---/+++ lines) says nothing new here.
-            if line.hasPrefix("diff ") || line.hasPrefix("index ") || line.hasPrefix("--- ") || line.hasPrefix("+++ ")
-                || line.hasPrefix("new file") || line.hasPrefix("deleted file") { continue }
-            var piece = AttributedString(String(line) + "\n")
-            if line.hasPrefix("+") {
+            if line.hasPrefix("@@") {
+                if hunks > 0 {
+                    var gap = AttributedString("⋯\n")
+                    gap.foregroundColor = .secondary
+                    out += gap
+                }
+                hunks += 1
+                continue
+            }
+            // The header (diff --git, index, ---/+++ lines) says nothing here.
+            guard hunks > 0, let mark = line.first else { continue }
+            var piece = AttributedString(String(line.dropFirst()))
+            switch mark {
+            case "~": piece = AttributedString("\n")
+            case "+":
                 piece.foregroundColor = .green
-                piece.backgroundColor = .green.opacity(0.08)
-            } else if line.hasPrefix("-") {
+                piece.backgroundColor = .green.opacity(0.15)
+            case "-":
                 piece.foregroundColor = .red
-                piece.backgroundColor = .red.opacity(0.08)
-            } else if line.hasPrefix("@@") {
-                piece.foregroundColor = .secondary
+                piece.strikethroughStyle = .single
+            case " ": break
+            default: continue
             }
             out += piece
+            if out.characters.count > 8000 {
+                out += AttributedString("…")
+                break
+            }
         }
-        return out
+        while let last = out.characters.last, last.isNewline { out.characters.removeLast() }
+        return out.characters.isEmpty ? AttributedString("No text changes to show.") : out
     }
 }

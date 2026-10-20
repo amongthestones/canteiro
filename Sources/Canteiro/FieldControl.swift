@@ -4,6 +4,7 @@ import SwiftUI
 struct FieldControl: View {
     @Environment(\.inSettingsForm) private var inSettingsForm
     @Environment(\.guidField) private var guidField
+    @Environment(\.entryRename) private var rename
     let spec: FieldSpec
     @Binding var value: FieldValue
     var slug: String?
@@ -28,7 +29,8 @@ struct FieldControl: View {
                 TextField(spec.title, text: stringBinding, prompt: Text(Placeholder.text(for: spec)))
                     .textFieldStyle(.plain)
                     .labelsHidden()
-                if let slug {
+                // With its own row below, the slug isn't repeated here.
+                if let slug, rename == nil {
                     Text("\(spec.slug?.label ?? "Address"): \(slug)")
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)

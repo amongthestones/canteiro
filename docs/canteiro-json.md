@@ -29,7 +29,23 @@ A full example:
     },
     "guid": "{show}-{number}"
   },
-  "syntax": ["highlight", "inlineFootnotes", "callouts", "toc"]
+  "syntax": ["highlight", "inlineFootnotes", "callouts", "toc"],
+  "redirects": "public/_redirects",
+  "rich": {
+    "fonts": [
+      "node_modules/@fontsource/noto-serif/files/noto-serif-latin-400-normal.woff2",
+      "node_modules/@fontsource/noto-serif/files/noto-serif-latin-700-normal.woff2",
+      "node_modules/@fontsource/noto-sans/files/noto-sans-latin-700-normal.woff2"
+    ],
+    "body": "Noto Serif",
+    "headings": "Noto Sans",
+    "size": 18,
+    "lineHeight": 1.6,
+    "headingSizes": [2, 1.625, 1.375, 1.125, 1, 1],
+    "width": 675,
+    "colors": { "text": "#222", "headings": "#111", "links": "#111", "background": "#fff" },
+    "dark": { "text": "#c8c8c8", "headings": "#e8e8e8", "links": "#e8e8e8", "background": "#1c1914" }
+  }
 }
 ```
 
@@ -72,3 +88,29 @@ Markdown your site's remark or rehype plugins add, for the editor to style:
 | `toc` | `{{TOC}}` | faded |
 
 Only the editor reads this. How the site renders it is up to the site.
+
+## redirects
+
+The site's `_redirects` file, relative to the site, such as `public/_redirects`. Cloudflare Pages and Netlify both read this format.
+
+When you change the slug of an entry that's live (published and not a draft), its address changes and links to the old one would break. With this set, Canteiro adds a line sending the old address to the new one, under a `# Renamed in Canteiro` heading at the end of the file. Rules that already sent somewhere to the old address are pointed straight at the new one, so there's no chain. Addresses come from the collection's `previewUrl` in your Keystatic config.
+
+Without it, Canteiro still warns before renaming a live entry, and the redirect is up to you.
+
+## rich
+
+How the Rich view looks, copied from your site's CSS so writing looks close to the published page. Markdown view keeps its monospaced look either way. Every key is optional, and anything left out stays as Canteiro's own.
+
+| Key | Meaning |
+|---|---|
+| `fonts` | Font files to load, relative to the site: TTF, OTF, WOFF or WOFF2. `*` matches in the file name. List one file per weight and style you use: regular, bold, italic and bold italic for the body, bold for headings. Files under `node_modules` need `npm install` first. |
+| `body` | The body's font family, as the files name it (`Noto Serif`), or any font installed on the Mac. |
+| `headings` | The headings' font family, shown bold. |
+| `size` | The body size in points. A CSS pixel is a point, so `font-size: 18px` (or `1.125em` on a 16px root) is `18`. |
+| `lineHeight` | The CSS `line-height`, as a multiple of the size: `1.6`. |
+| `headingSizes` | `h1` to `h6`, as multiples of the body size, as in the CSS's `em` values. |
+| `width` | The reading column in points, so lines wrap where the site's do. A `max-width: 37.5em` column at 18px is `675`. |
+| `colors` | Hex colors for `text`, `headings`, `links` and the page `background`. |
+| `dark` | The same colors for dark mode. Without them, dark mode keeps Canteiro's own colors, so dark text never lands on a dark window. |
+
+If a font file or family isn't found, or a color isn't hex, Rich uses Canteiro's own for that part and the problem is listed in the sidebar, for example `canteiro.json: rich: no font named "Noto Serif"`.

@@ -11,7 +11,7 @@ How Canteiro works, part by part. For what goes in `canteiro.json`, see [canteir
 - [Photos](#photos)
 - [Podcast episodes](#podcast-episodes)
 - [The inbox](#the-inbox)
-- [Preview](#preview)
+- [Open in Browser](#open-in-browser)
 - [Publish](#publish)
 - [Settings](#settings)
 - [Keyboard shortcuts](#keyboard-shortcuts)
@@ -20,10 +20,10 @@ How Canteiro works, part by part. For what goes in `canteiro.json`, see [canteir
 
 Three columns, like Mail.
 
-- **Sidebar:** your collections and singletons, grouped the way your Keystatic config's `ui.navigation` groups them, with a count beside each collection. Anything the navigation leaves out goes in a last "Other" group, so nothing is hidden. Problems reading the site (a file that doesn't parse, a broken `canteiro.json`) are listed at the bottom.
+- **Sidebar:** your collections and singletons, grouped the way your Keystatic config's `ui.navigation` groups them, with a count beside each collection. Anything the navigation leaves out goes in a last "Other" group, so nothing is hidden. To put the sections in another order, choose View › Arrange Sections… (or right-click a heading) and drag them in the list. The order is kept for each site on this Mac, and Restore Default Order goes back to the config's. Problems reading the site (a file that doesn't parse, a broken `canteiro.json`) are listed at the bottom.
 - **List:** a collection's entries, newest first when it has a date field, else by its first number field. Drafts have an orange dot. Each row is the title, the date, and two lines of the text.
 - **Editor:** the entry's fields on top and the body below. Fields that are empty and optional fold under "More fields", so the top stays short. Singletons skip the list and open straight into their form.
-- **Toolbar:** New Entry, the list filter and sort, search, Markdown or Rich, Publish (with a count of changed files) and Preview.
+- **Toolbar:** New Entry, the list filter and sort, search, Markdown or Rich, Open in Browser, and Publish (with a count of changed files).
 
 ## Fields
 
@@ -32,7 +32,7 @@ Each Keystatic field type gets a native control. The names link to Keystatic's d
 | Keystatic field | In Canteiro |
 |---|---|
 | [`text`](https://keystatic.com/docs/fields/text) (one line or multiline), [`url`](https://keystatic.com/docs/fields/url) | a text field, with a character count when the field has a maximum length |
-| [`slug`](https://keystatic.com/docs/fields/slug) | a text field with the address it makes shown under it |
+| [`slug`](https://keystatic.com/docs/fields/slug) | the name in its own row, and the slug in a row under it. In a collection, changing the slug renames the entry when you press Return or leave the field: its file and folders move, and image paths in it follow. A live entry asks first, since links to its old address would break, and gets a redirect when `canteiro.json` names a `redirects` file |
 | [`integer`](https://keystatic.com/docs/fields/integer) | a number field |
 | [`checkbox`](https://keystatic.com/docs/fields/checkbox) | a switch |
 | [`select`](https://keystatic.com/docs/fields/select) | a menu |
@@ -61,9 +61,11 @@ These files are saved into the repo as they are and show up in Publish with the 
 The body editor grows with its text, so the fields and the body scroll together as one page. Smart quotes and dash substitution are off: markdown is saved as typed.
 
 - **Markdown view:** a monospaced font, with the marks (`#`, `**`, `[`, `](…)`, table pipes) faded but visible.
-- **Rich view (⌘R):** a reading font with the marks hidden. Headings are sized, bold and italics shown, links underlined, quotes and list markers set back, and tables laid out in columns with `:---:` alignment.
+- **Rich view (⌘R):** a reading font with the marks hidden. Headings are sized, bold and italics shown, links underlined, quotes and list markers set back, and tables laid out in columns with `:---:` alignment. A photo on a line of its own shows in place of its `![](…)` line once it has loaded from its address. Switch to Markdown to edit the line.
 
 Rich is not a separate editor that converts to and from markdown. It's the same text drawn differently, so the file on disk is what you typed in either view.
+
+Rich can also take your site's type and colors: its fonts, text size, line height, reading width and colors, in light and dark mode. You name them in the `rich` block of `canteiro.json`. Writing then looks close to the published page, and Open in Browser shows the real thing.
 
 Your site's own markdown extras can be styled too, if `canteiro.json` names them: `==highlights==`, iA Writer's `[^inline footnotes]`, `^^^callouts^^^` and `{{TOC}}`.
 
@@ -127,20 +129,24 @@ If `canteiro.json` has an `inbox`, a sidebar section lists the drafts in that fo
 
 Plain `.md`, `.markdown` and `.txt` files are listed. Folders and hidden files are skipped. Choose Folder… sets a different folder on this Mac only, over the one in `canteiro.json`. Each site keeps its own.
 
-## Preview
+## Open in Browser
 
-Preview (⌥⌘P) opens a window with the selected entry as your site renders it, using the collection's `previewUrl` from your Keystatic config.
+Open in Browser (⌥⌘P, or the Safari button in the toolbar) opens the selected entry in your browser as your site renders it, drafts included, using the collection's `previewUrl` from your Keystatic config. A settings page opens the home page. Your edits are saved first, and Astro reloads the page in the browser as you go on saving.
 
 - If an `astro dev` server is already running for this site, Canteiro uses it.
-- If not, it starts one on a free port between 4321 and 4340, and stops it when Canteiro quits.
+- If not, it starts one on a free port between 4321 and 4340, and stops it when Canteiro quits or you open another site. The first time takes a few seconds while Astro starts.
 
 ## Publish
 
 ![The Publish sheet: the changed files with checkboxes, a colored diff, the suggested commit message and Commit and Push](images/publish.jpg)
 
-Publish opens a sheet with every changed file and its diff. Untick any you don't want in this commit. Canteiro suggests a message from the titles of what changed ("Edit Morning Walk and Tags", "Add Field Notes"), which you can rewrite.
+Publish opens a sheet with every changed file. Open one to see what changed in it: each changed line once, with removed words struck through in red and added words in green. Untick any you don't want in this commit.
+
+To undo a change instead, open the file and choose Discard Changes…. The file goes back to the last commit, and your version goes to the Trash, so a slip can be put back from there. A file that's new since the last commit goes to the Trash whole. An entry open in the editor is read again. Canteiro suggests a message from the titles of what changed ("Edit Morning Walk and Tags", "Add Field Notes"), which you can rewrite.
 
 It commits exactly the files you picked, nothing else that's staged, and pushes to your current branch with the system `git`. Canteiro never asks for a password: a push that needs one fails with a message instead of hanging. If the push is turned down because the remote has newer commits, it offers to pull them first (a rebase that sets any other work in progress aside while it runs) and push again.
+
+After the push, the bar at the bottom of the window follows the build: building, then live, or failed with the reason, and Show Log opens your host's page for that build. Canteiro asks GitHub how the commit's checks are going, which Cloudflare Pages and Netlify both report there, using the [GitHub CLI](https://cli.github.com) (`gh`) you're signed in to. There's nothing to set up in Canteiro. Without `gh`, or with `gh` not signed in (`gh auth login` in Terminal), the build just doesn't show, and Publish works the same.
 
 ## Settings
 
@@ -161,7 +167,7 @@ The bucket and public address belong to the site and come from its `canteiro.jso
 | ⌘↩ | Save the aside |
 | ⌘S | Save now |
 | ⌘R | Switch between Markdown and Rich |
-| ⌥⌘P | Show or hide Preview |
+| ⌥⌘P | Open the entry in the browser |
 | ⌘O | Open a site |
 | ⌘1 to ⌘9 | Open a recent site (File › Open Recent) |
 | ⇧⌘R | Reload the site (rereads the config, the files and `canteiro.json`) |

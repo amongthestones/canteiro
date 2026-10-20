@@ -112,4 +112,23 @@ import Testing
         #expect(at(rich, "Intro")[.tableGrid] == nil)
         #expect(at(plain, "Account")[.tableGrid] == nil)
     }
+    @Test func richMakesRoomForALoadedPhoto() {
+        let url = "https://media.example.com/a.jpg"
+        let text = "Before.\n\n![](\(url))\n\nAfter ![](\(url)) inline.\n"
+        #expect(MarkdownStyler.imageURLs(in: text) == [url, url])
+        let s = NSTextStorage(string: text)
+        MarkdownStyler.style(s, mode: .rich, images: [url: NSSize(width: 1200, height: 900)])
+        #expect(s.string == text, "the photo is drawn, never inserted")
+        let photo = at(s, "![](")[.inlineImage] as? InlineImage
+        #expect(photo?.size == NSSize(width: 600, height: 450))
+        #expect((at(s, "![](")[.paragraphStyle] as? NSParagraphStyle)?.paragraphSpacingBefore == 450)
+        #expect(hidden(at(s, "![](")), "the photo stands in for its line")
+        let first = NSTextStorage(string: "![](\(url))\n")
+        MarkdownStyler.style(first, mode: .rich, images: [url: NSSize(width: 1200, height: 900)])
+        #expect((first.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?.minimumLineHeight == 451,
+                "the first line can't have space before it, so it grows")
+        #expect(at(s, "After")[.inlineImage] == nil, "only a photo on its own line")
+        MarkdownStyler.style(s, mode: .markdown, images: [url: NSSize(width: 1200, height: 900)])
+        #expect(at(s, "![](")[.inlineImage] == nil)
+    }
 }
