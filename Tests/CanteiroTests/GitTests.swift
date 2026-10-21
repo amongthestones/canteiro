@@ -39,6 +39,25 @@ import Testing
         #expect(Git.diff(work, changes.first { $0.path == "src/new file.md" }!).contains("+new"))
     }
 
+    @Test func listsAndSwitchesBranches() throws {
+        let (work, _) = try repo()
+        try sh(work, ["switch", "-q", "-c", "reading"])
+        try sh(work, ["push", "-q", "-u", "origin", "reading"])
+        try sh(work, ["switch", "-q", "main"])
+        try sh(work, ["branch", "-q", "-D", "reading"])
+
+        // Pushed but deleted here: listed as only on GitHub.
+        var found = Git.branches(work)
+        #expect(found.local == ["main"])
+        #expect(found.remote == ["reading"])
+
+        try Git.switchTo(work, "reading")
+        #expect(Git.branch(work) == "reading")
+        found = Git.branches(work)
+        #expect(found.local.sorted() == ["main", "reading"])
+        #expect(found.remote.isEmpty)
+    }
+
     @Test func publishesOnlyThePickedFiles() throws {
         let (work, remote) = try repo()
         try "title: Two\n".write(to: work.appending(path: "post.yaml"), atomically: true, encoding: .utf8)

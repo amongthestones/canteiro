@@ -34,6 +34,8 @@ final class SiteStore {
     private(set) var saveErrors: [Entry.ID: String] = [:]
     /// Changed files in the site's repo, for Publish.
     private(set) var changes: [GitChange] = []
+    /// The checked-out branch, for the toolbar.
+    private(set) var branch: String?
     /// Uploads in flight, for the bar at the bottom of the window.
     private(set) var uploads: [Upload] = []
     /// The site's build after the last push.
@@ -564,9 +566,47 @@ final class SiteStore {
     func refreshChanges() {
         guard let siteURL else { return }
         Task {
-            let found = await Task.detached { (try? Git.status(siteURL)) ?? [] }.value
-            if self.siteURL == siteURL { changes = found }
+            let (found, current) = await Task.detached { ((try? Git.status(siteURL)) ?? [], Git.branch(siteURL)) }.value
+            if self.siteURL == siteURL {
+                changes = found
+                branch = current
+            }
         }
+    }
+
+    /// Moves the site to another branch. Open edits save first. Edits to
+    /// committed files would follow along to the other branch, so they're
+    /// published or discarded before; new files do follow, as git does.
+    /// Every editor open before the switch is retired, so none can save its
+    /// old copy over the other branch's file.
+    func switchBranch(to name: String) async {
+        guard let siteURL, name != branch else { return }
+        let place = selectedEntry
+        selectedEntry = [:]
+        // Closing an editor saves it.
+        try? await Task.sleep(for: .milliseconds(250))
+        let found = await Task.detached { (try? Git.status(siteURL)) ?? [] }.value
+        let edited = found.filter { $0.code != "??" }
+        guard edited.isEmpty else {
+            changes = found
+            selectedEntry = place
+            lastError = "Publish or discard \(edited.count == 1 ? "1 change" : "\(edited.count) changes") before switching to \(name)."
+            return
+        }
+        do {
+            try await Task.detached { try Git.switchTo(siteURL, name) }.value
+        } catch {
+            selectedEntry = place
+            lastError = error.localizedDescription
+            return
+        }
+        for list in entries.values {
+            for entry in list { revisions[entry.id, default: 0] += 1 }
+        }
+        for entry in singletons.values { revisions[entry.id, default: 0] += 1 }
+        await open(siteURL)
+        // Back to the same entries, where the other branch has them.
+        selectedEntry = place.filter { key, id in entries[key]?.contains { $0.id == id } == true }
     }
 
     /// What renaming an entry would mean: whether it's live (committed and

@@ -39,6 +39,23 @@ enum Git {
         try? run(site, ["rev-parse", "--abbrev-ref", "HEAD"]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Local branches, then branches only on GitHub, for the branch menu.
+    static func branches(_ site: URL) -> (local: [String], remote: [String]) {
+        func names(_ arguments: [String]) -> [String] {
+            ((try? run(site, arguments)) ?? "").split(separator: "\n").map(String.init)
+        }
+        let local = names(["for-each-ref", "--format=%(refname:short)", "refs/heads"])
+        let remote = names(["for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin"])
+            .filter { $0 != "HEAD" && !local.contains($0) }
+        return (local, remote)
+    }
+
+    /// Checks out a branch. One only on GitHub becomes a local branch that
+    /// tracks it, so Publish pushes back to it.
+    static func switchTo(_ site: URL, _ branch: String) throws {
+        _ = try run(site, ["switch", branch])
+    }
+
     /// The last commit's full hash.
     static func head(_ site: URL) -> String? {
         try? run(site, ["rev-parse", "HEAD"]).trimmingCharacters(in: .whitespacesAndNewlines)

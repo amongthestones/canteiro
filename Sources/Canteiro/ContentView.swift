@@ -31,6 +31,9 @@ struct ContentView: View {
                         OpenInBrowserButton()
                     }
                     ToolbarItem(placement: .primaryAction) {
+                        BranchMenu()
+                    }
+                    ToolbarItem(placement: .primaryAction) {
                         Button {
                             showPublish = true
                         } label: {

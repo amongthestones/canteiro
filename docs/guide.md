@@ -146,6 +146,12 @@ To undo a change instead, open the file and choose Discard Changes…. The file 
 
 It commits exactly the files you picked, nothing else that's staged, and pushes to your current branch with the system `git`. Canteiro never asks for a password: a push that needs one fails with a message instead of hanging. If the push is turned down because the remote has newer commits, it offers to pull them first (a rebase that sets any other work in progress aside while it runs) and push again.
 
+### Branches
+
+The branch menu in the toolbar shows the branch you're on, and Publish commits to it. Pick another to switch: the whole site reloads from that branch, config included. Branches that are only on GitHub are listed under Only on GitHub; picking one brings it down and switches to it. A post published on a branch other than the one your host builds from won't go live until that branch is merged.
+
+Before it switches, Canteiro saves what's open. If you've changed files the last commit has, it won't switch: those edits would follow you to the other branch. Publish or discard them first. New files do come along, as they do with `git switch`.
+
 After the push, the bar at the bottom of the window follows the build: building, then live, or failed with the reason, and Show Log opens your host's page for that build. Canteiro asks GitHub how the commit's checks are going, which Cloudflare Pages and Netlify both report there, using the [GitHub CLI](https://cli.github.com) (`gh`) you're signed in to. There's nothing to set up in Canteiro. Without `gh`, or with `gh` not signed in (`gh auth login` in Terminal), the build just doesn't show, and Publish works the same.
 
 ## Settings

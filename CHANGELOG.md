@@ -4,6 +4,8 @@ What changed in each version of Canteiro, newest first. Downloads are on [Releas
 
 ## Unreleased
 
+- A branch menu in the toolbar shows the branch Publish commits to and switches the site to another one, including branches only on GitHub. It won't switch while committed files have unpublished edits.
+- A field you fill in no longer jumps from More fields to the top of the form while you type. The form keeps the layout it opened with.
 - Rich is now called Read, the view for reading what you've written as it will look. ⌘R still switches to it.
 - Read no longer adds extra space between paragraphs. Its lines are as tall as Markdown's, so switching views (⌘R) doesn't move the text.
 - An entry's slug has its own row under the title and can be changed. Its file, image folders and image paths move with it. Renaming a live entry asks first and adds a redirect from the old address when `canteiro.json` names a `redirects` file.
