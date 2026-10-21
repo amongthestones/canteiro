@@ -581,6 +581,23 @@ final class SiteStore {
     /// old copy over the other branch's file.
     func switchBranch(to name: String) async {
         guard let siteURL, name != branch else { return }
+        await moveBranch(to: name) { try Git.switchTo(siteURL, name) }
+    }
+
+    /// The one branch Canteiro makes: a place to try things before they go
+    /// live, started from main (or the current branch, without one).
+    static let stagingBranch = "staging"
+
+    func makeStagingBranch() async {
+        guard let siteURL, let current = branch else { return }
+        let name = Self.stagingBranch
+        let base = Git.branches(siteURL).local.contains("main") ? "main" : current
+        await moveBranch(to: name) { try Git.createBranch(siteURL, name, from: base) }
+    }
+
+    /// Runs a checkout safely: see switchBranch.
+    private func moveBranch(to name: String, _ checkout: @escaping @Sendable () throws -> Void) async {
+        guard let siteURL else { return }
         let place = selectedEntry
         selectedEntry = [:]
         // Closing an editor saves it.
@@ -594,8 +611,10 @@ final class SiteStore {
             return
         }
         do {
-            try await Task.detached { try Git.switchTo(siteURL, name) }.value
+            try await Task.detached { try checkout() }.value
         } catch {
+            // A failed push still leaves the new branch checked out.
+            if Git.branch(siteURL) == name { await open(siteURL) }
             selectedEntry = place
             lastError = error.localizedDescription
             return

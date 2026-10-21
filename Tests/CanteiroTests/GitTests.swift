@@ -58,6 +58,17 @@ import Testing
         #expect(found.remote.isEmpty)
     }
 
+    @Test func makesAndPushesABranch() throws {
+        let (work, remote) = try repo()
+        try Git.createBranch(work, "staging", from: "main")
+        #expect(Git.branch(work) == "staging")
+        let pushed = try Subprocess.run(Git.git, ["-C", remote.path, "branch", "--list", "staging"], timeout: 10).stdoutString
+        #expect(pushed.contains("staging"))
+        // Tracks GitHub's copy, so a plain push goes there.
+        let upstream = try Subprocess.run(Git.git, ["-C", work.path, "rev-parse", "--abbrev-ref", "@{u}"], timeout: 10).stdoutString
+        #expect(upstream.trimmingCharacters(in: .whitespacesAndNewlines) == "origin/staging")
+    }
+
     @Test func publishesOnlyThePickedFiles() throws {
         let (work, remote) = try repo()
         try "title: Two\n".write(to: work.appending(path: "post.yaml"), atomically: true, encoding: .utf8)

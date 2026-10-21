@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// The checked-out branch, and a menu to switch to another one. Branches
-/// only on GitHub are listed apart; picking one checks it out here.
+/// only on GitHub are listed apart; picking one checks it out here. The one
+/// branch it can make is staging.
 struct BranchMenu: View {
     @Environment(SiteStore.self) private var store
     @State private var local: [String] = []
@@ -18,6 +19,13 @@ struct BranchMenu: View {
                         Button(name) { pick(name) }
                     }
                 }
+            }
+            if !local.isEmpty, !(local + remote).contains(SiteStore.stagingBranch) {
+                Divider()
+                Button("Make a Staging Branch") {
+                    Task { await store.makeStagingBranch() }
+                }
+                .help("Starts a staging branch from main and pushes it, for trying things on a preview before they go live")
             }
         } label: {
             Label(store.branch ?? "Branch", systemImage: "arrow.triangle.branch")

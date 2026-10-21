@@ -56,6 +56,13 @@ enum Git {
         _ = try run(site, ["switch", branch])
     }
 
+    /// Starts a branch from another, switches to it and pushes it, so it
+    /// has a preview build and Publish can push to it.
+    static func createBranch(_ site: URL, _ branch: String, from base: String) throws {
+        _ = try run(site, ["switch", "-c", branch, base])
+        _ = try run(site, ["push", "-u", "origin", branch], timeout: 90)
+    }
+
     /// The last commit's full hash.
     static func head(_ site: URL) -> String? {
         try? run(site, ["rev-parse", "HEAD"]).trimmingCharacters(in: .whitespacesAndNewlines)

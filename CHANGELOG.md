@@ -4,7 +4,7 @@ What changed in each version of Canteiro, newest first. Downloads are on [Releas
 
 ## Unreleased
 
-- A branch menu in the toolbar shows the branch Publish commits to and switches the site to another one, including branches only on GitHub. It won't switch while committed files have unpublished edits.
+- A branch menu in the toolbar shows the branch Publish commits to and switches the site to another one, including branches only on GitHub. It won't switch while committed files have unpublished edits. Make a Staging Branch starts a `staging` branch from `main` and pushes it, for trying things on a preview before they go live.
 - A field you fill in no longer jumps from More fields to the top of the form while you type. The form keeps the layout it opened with.
 - Rich is now called Read, the view for reading what you've written as it will look. ⌘R still switches to it.
 - Read no longer adds extra space between paragraphs. Its lines are as tall as Markdown's, so switching views (⌘R) doesn't move the text.

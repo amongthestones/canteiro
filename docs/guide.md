@@ -150,6 +150,8 @@ It commits exactly the files you picked, nothing else that's staged, and pushes 
 
 The branch menu in the toolbar shows the branch you're on, and Publish commits to it. Pick another to switch: the whole site reloads from that branch, config included. Branches that are only on GitHub are listed under Only on GitHub; picking one brings it down and switches to it. A post published on a branch other than the one your host builds from won't go live until that branch is merged.
 
+To try things before they go live, choose Make a Staging Branch. It's there until the site has a `staging` branch: Canteiro starts one from `main`, pushes it to GitHub and switches to it. Publish there, look at the host's preview of the branch (with Cloudflare Pages, `staging.<project>.pages.dev`), and merge it into `main` when it's right. That's the only branch Canteiro makes; any others you make with git show up in the menu.
+
 Before it switches, Canteiro saves what's open. If you've changed files the last commit has, it won't switch: those edits would follow you to the other branch. Publish or discard them first. New files do come along, as they do with `git switch`.
 
 After the push, the bar at the bottom of the window follows the build: building, then live, or failed with the reason, and Show Log opens your host's page for that build. Canteiro asks GitHub how the commit's checks are going, which Cloudflare Pages and Netlify both report there, using the [GitHub CLI](https://cli.github.com) (`gh`) you're signed in to. There's nothing to set up in Canteiro. Without `gh`, or with `gh` not signed in (`gh auth login` in Terminal), the build just doesn't show, and Publish works the same.
