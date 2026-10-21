@@ -10,6 +10,10 @@ struct EntryEditor: View {
     @State private var data: FieldValue
     @State private var text: String
     @State private var showMore = false
+    /// Fields that had a value when the entry opened. State, so it outlives
+    /// autosave: each save hands in a fresh `entry`, and a field filled
+    /// since then must stay where it is.
+    @State private var filledAtOpen: Set<String>
     /// Blank lines between the frontmatter and the text. Most imported posts
     /// have one; the editor starts at the first real line, and saves put
     /// them back so the file doesn't change for it.
@@ -22,6 +26,7 @@ struct EntryEditor: View {
         lead = parts.lead
         _data = State(initialValue: entry.data)
         _text = State(initialValue: parts.text)
+        _filledAtOpen = State(initialValue: Set(item.dataFields.map(\.key).filter { !(entry.data[$0]?.isEmpty ?? true) }))
     }
 
     /// The blank lines at the top of a body, and the rest.
@@ -32,8 +37,8 @@ struct EntryEditor: View {
 
     /// Fields worth seeing at once: required ones, ones with a value, and
     /// switches and menus. Empty optional fields fold under "More fields".
-    /// Decided from the file as opened, so a field doesn't jump away when
-    /// it's cleared.
+    /// Decided from the file as opened, so a field doesn't jump when it's
+    /// cleared or filled.
     private var split: (main: [FieldSpec], more: [FieldSpec]) {
         let fields = item.dataFields
         guard item.kind == .collection else { return (fields, []) }
@@ -41,7 +46,7 @@ struct EntryEditor: View {
             field.validation?.isRequired == true
                 || (field.validation?.length?.min ?? 0) > 0
                 || ["slug", "checkbox", "select"].contains(field.type)
-                || !(entry.data[field.key]?.isEmpty ?? true)
+                || filledAtOpen.contains(field.key)
         }
         let mainKeys = Set(main.map(\.key))
         return (main, fields.filter { !mainKeys.contains($0.key) })
