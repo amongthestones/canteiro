@@ -83,9 +83,18 @@ extension View {
     }
 }
 
+/// A key by hand, not @Entry: the macro warns about storing a closure,
+/// which can't be compared.
+private struct SaveEntryKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
 extension FocusedValues {
     /// The open editor's save, for File › Save.
-    @Entry var saveEntry: (() -> Void)?
+    var saveEntry: (() -> Void)? {
+        get { self[SaveEntryKey.self] }
+        set { self[SaveEntryKey.self] = newValue }
+    }
 }
 
 struct SaveCommand: Commands {
