@@ -69,6 +69,21 @@ import Testing
         #expect(upstream.trimmingCharacters(in: .whitespacesAndNewlines) == "origin/staging")
     }
 
+    @Test func noticesConfigAndBranchChanges() throws {
+        let (work, _) = try repo()
+        let config = work.appending(path: "keystatic.config.ts")
+        try "export default {}\n".write(to: config, atomically: true, encoding: .utf8)
+        let first = SiteStore.loadedFrom(work)
+        #expect(SiteStore.loadedFrom(work) == first)
+
+        try "export default { collections: {} }\n".write(to: config, atomically: true, encoding: .utf8)
+        let edited = SiteStore.loadedFrom(work)
+        #expect(edited != first)
+
+        try sh(work, ["switch", "-q", "-c", "staging"])
+        #expect(SiteStore.loadedFrom(work) != edited)
+    }
+
     @Test func publishesOnlyThePickedFiles() throws {
         let (work, remote) = try repo()
         try "title: Two\n".write(to: work.appending(path: "post.yaml"), atomically: true, encoding: .utf8)

@@ -56,8 +56,9 @@ struct ContentView: View {
         .onChange(of: store.siteURL) { server.siteChanged(store.siteURL) }
         .onChange(of: store.config, initial: true) { inbox.configure(store.config, site: store.siteURL) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            // Catch commits and edits made outside the app.
-            store.refreshChanges()
+            // Catch commits, edits, config changes and branch switches made
+            // outside the app.
+            Task { await store.reloadIfChangedOutside() }
             inbox.refresh()
         }
     }

@@ -76,6 +76,7 @@ The Format menu writes the marks for you, with iA Writer's shortcuts. Each one t
 - Changes save themselves a moment after you stop typing, on ⌘S, and when you leave the entry.
 - In markdown and YAML files, a field you didn't touch keeps its original text, quoting and comments included. Changed and new fields are written the way Keystatic writes them.
 - If the file changed on disk since Canteiro read it (another editor, a `git pull`), nothing is saved. A bar offers "Use the File on Disk" or "Keep My Version".
+- When you come back to Canteiro and `keystatic.config.ts`, `canteiro.json` or the checked-out branch changed while you were away, the site reloads on its own, so the forms match the files they write. ⇧⌘R does the same by hand.
 
 ## New entries, search and trash
 

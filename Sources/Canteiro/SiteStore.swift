@@ -36,6 +36,14 @@ final class SiteStore {
     private(set) var changes: [GitChange] = []
     /// The checked-out branch, for the toolbar.
     private(set) var branch: String?
+    /// The config and branch the site was last loaded from, to notice when
+    /// they change outside the app.
+    private var loadedFrom: LoadedFrom?
+
+    struct LoadedFrom: Equatable, Sendable {
+        var config: String
+        var branch: String?
+    }
     /// Uploads in flight, for the bar at the bottom of the window.
     private(set) var uploads: [Upload] = []
     /// The site's build after the last push.
@@ -206,6 +214,9 @@ final class SiteStore {
         UserDefaults.standard.set(paths, forKey: Self.recentKey)
         recentSites = paths.map { URL(fileURLWithPath: $0) }
         do {
+            // Read before the schema, so a change made during the load is
+            // still caught next time.
+            loadedFrom = await Task.detached { Self.loadedFrom(url) }.value
             let schema = try await SchemaLoader.load(site: url)
             let loaded = await Task.detached(priority: .userInitiated) { Self.readAll(schema, site: url) }.value
             self.schema = schema
@@ -619,12 +630,35 @@ final class SiteStore {
             lastError = error.localizedDescription
             return
         }
+        await reopen(siteURL, at: place)
+    }
+
+    nonisolated static func loadedFrom(_ site: URL) -> LoadedFrom {
+        let config = ["keystatic.config.ts", "canteiro.json"]
+            .map { (try? String(contentsOf: site.appending(path: $0), encoding: .utf8)) ?? "" }
+            .joined(separator: "\0")
+        return LoadedFrom(config: config, branch: Git.branch(site))
+    }
+
+    /// Reloads the site when its config or branch changed outside the app
+    /// (another editor, git in Terminal), so the forms match the files they
+    /// write. Called when the app comes back to the front.
+    func reloadIfChangedOutside() async {
+        guard let siteURL, phase == .ready, let before = loadedFrom else { return refreshChanges() }
+        let now = await Task.detached { Self.loadedFrom(siteURL) }.value
+        guard now != before else { return refreshChanges() }
+        await reopen(siteURL, at: selectedEntry)
+    }
+
+    /// Reads the site again with every open editor retired, so none can save
+    /// its old copy over a file that changed under it, then goes back to the
+    /// same entries where they still exist.
+    private func reopen(_ siteURL: URL, at place: [String: Entry.ID]) async {
         for list in entries.values {
             for entry in list { revisions[entry.id, default: 0] += 1 }
         }
         for entry in singletons.values { revisions[entry.id, default: 0] += 1 }
         await open(siteURL)
-        // Back to the same entries, where the other branch has them.
         selectedEntry = place.filter { key, id in entries[key]?.contains { $0.id == id } == true }
     }
 
