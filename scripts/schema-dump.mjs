@@ -9,7 +9,7 @@
 // node_modules. Takes about a quarter second.
 
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -19,7 +19,9 @@ const root = resolve(process.argv[2] ?? process.cwd());
 const require = createRequire(join(root, 'package.json'));
 const vitePkgPath = require.resolve('vite/package.json');
 const vitePkg = JSON.parse(readFileSync(vitePkgPath, 'utf8'));
-const entry = vitePkg.exports['.'].import;
+// Vite 8 exports a plain path; older versions an { import } condition.
+const dot = vitePkg.exports['.'];
+const entry = typeof dot === 'string' ? dot : dot.import;
 const entryPath = typeof entry === 'string' ? entry : entry.default;
 const { createServer } = await import(pathToFileURL(join(dirname(vitePkgPath), entryPath)).href);
 
@@ -40,15 +42,18 @@ const fields = Object.fromEntries(Object.entries(realFields).map(([n, make]) =>
 
 // Astro's content schema holds rules Keystatic can't express, like "a post
 // has one kind" (a list capped at one). Load it with a stand-in for the
-// astro:content module so its zod schemas can be read.
+// astro:content module (and astro/loaders, which Astro 5+ configs import) so
+// its zod schemas can be read.
 const astroContent = {
   name: 'astro-content-stub',
   enforce: 'pre',
   resolveId(id) {
     if (id === 'astro:content') return '\0astro-content-stub';
+    if (id === 'astro/loaders') return '\0astro-loaders-stub';
   },
   load(id) {
     if (id === '\0astro-content-stub') return `export { z } from 'astro/zod'; export const defineCollection = (c) => c;`;
+    if (id === '\0astro-loaders-stub') return `export const glob = (o) => o; export const file = (p) => ({ path: p });`;
   },
 };
 
@@ -58,10 +63,15 @@ const vite = await createServer({
 });
 const { default: cfg } = await vite.ssrLoadModule('/keystatic.config.ts');
 let astroCollections = {};
-try {
-  astroCollections = (await vite.ssrLoadModule('/src/content/config.ts')).collections ?? {};
-} catch {
-  // No Astro schema, or one this can't load: Keystatic's rules still apply.
+// Astro 5+ keeps it at src/content.config.ts, Astro 4 at src/content/config.ts.
+for (const file of ['/src/content.config.ts', '/src/content/config.ts']) {
+  if (!existsSync(join(root, file))) continue;
+  try {
+    astroCollections = (await vite.ssrLoadModule(file)).collections ?? {};
+  } catch {
+    // One this can't load: Keystatic's rules still apply.
+  }
+  break;
 }
 await vite.close();
 
@@ -80,8 +90,11 @@ for (const [name, collection] of Object.entries(astroCollections)) {
   for (const [key, field] of Object.entries(shape)) {
     let f = field;
     while (f?._def?.innerType) f = f._def.innerType;
-    const max = f?._def?.maxLength?.value;
-    if (f?._def?.typeName === 'ZodArray' && max != null) (limits[name] ??= {})[key] = { maxItems: max };
+    // Zod 3 keeps the cap in maxLength; Zod 4 in a max_length check.
+    const isArray = f?._def?.typeName === 'ZodArray' || f?._def?.type === 'array';
+    const max = f?._def?.maxLength?.value
+      ?? f?._def?.checks?.find((c) => c?._zod?.def?.check === 'max_length')?._zod.def.maximum;
+    if (isArray && max != null) (limits[name] ??= {})[key] = { maxItems: max };
   }
 }
 
