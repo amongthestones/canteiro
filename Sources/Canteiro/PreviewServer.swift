@@ -64,7 +64,7 @@ final class PreviewServer {
         let port = await Task.detached { DevServerScan.freePort() }.value
         let task = Process()
         task.executableURL = URL(fileURLWithPath: node)
-        task.arguments = [site.appending(path: "node_modules/astro/astro.js").path, "dev", "--port", String(port)]
+        task.arguments = [Self.astroBin(in: site).path, "dev", "--port", String(port)]
         task.currentDirectoryURL = site
         task.standardInput = FileHandle.nullDevice
         task.standardOutput = FileHandle.nullDevice
@@ -105,6 +105,18 @@ final class PreviewServer {
         if case .running = state { state = .idle }
     }
 
+    /// Astro's CLI script, from its package.json: Astro 7 moved it from
+    /// astro.js to bin/astro.mjs.
+    private static func astroBin(in site: URL) -> URL {
+        let astro = site.appending(path: "node_modules/astro")
+        if let data = try? Data(contentsOf: astro.appending(path: "package.json")),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            let bin = (json["bin"] as? [String: String])?["astro"] ?? json["bin"] as? String
+            if let bin { return astro.appending(path: bin) }
+        }
+        return astro.appending(path: "astro.js")
+    }
+
     private static func responds(_ url: URL) async -> Bool {
         var request = URLRequest(url: url)
         request.timeoutInterval = 1
@@ -116,10 +128,12 @@ final class PreviewServer {
 enum DevServerScan {
     static let ports = 4321...4340
 
-    /// A port in Astro's range whose server runs in the site's folder.
+    /// A port on any number whose server runs in the site's folder. Astro 7
+    /// allows one dev server per site, and one started with --background
+    /// can sit outside Astro's range.
     static func port(servingSite site: URL) -> Int? {
         let sitePath = site.resolvingSymlinksInPath().path
-        for (port, pid) in listeners() {
+        for (port, pid) in listeners(inRange: false) {
             guard let out = try? Subprocess.run("/usr/sbin/lsof", ["-a", "-p", String(pid), "-d", "cwd", "-Fn"]) else { continue }
             let cwd = out.stdoutString.split(separator: "\n").first { $0.hasPrefix("n") }.map { String($0.dropFirst()) }
             if cwd.map({ URL(fileURLWithPath: $0).resolvingSymlinksInPath().path }) == sitePath { return port }
@@ -132,9 +146,9 @@ enum DevServerScan {
         return ports.first { !taken.contains($0) } ?? ports.upperBound
     }
 
-    private static func listeners() -> [(port: Int, pid: Int32)] {
-        let range = "\(ports.lowerBound)-\(ports.upperBound)"
-        guard let out = try? Subprocess.run("/usr/sbin/lsof", ["-nP", "-iTCP:\(range)", "-sTCP:LISTEN", "-Fpn"]) else { return [] }
+    private static func listeners(inRange: Bool = true) -> [(port: Int, pid: Int32)] {
+        let tcp = inRange ? "-iTCP:\(ports.lowerBound)-\(ports.upperBound)" : "-iTCP"
+        guard let out = try? Subprocess.run("/usr/sbin/lsof", ["-nP", tcp, "-sTCP:LISTEN", "-Fpn"]) else { return [] }
         var result: [(Int, Int32)] = []
         var pid: Int32?
         for line in out.stdoutString.split(separator: "\n") {

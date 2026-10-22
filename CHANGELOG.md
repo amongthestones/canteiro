@@ -4,6 +4,7 @@ What changed in each version of Canteiro, newest first. Downloads are on [Releas
 
 ## Unreleased
 
+- Preview works again on sites using Astro 7. Canteiro runs Astro from its new location and finds a dev server already running for the site on any port, since Astro 7 allows only one per site.
 - Sites on Astro 5 or later (Vite 8, Zod 4, `src/content.config.ts`) keep the extra rules from the Astro schema, such as a list capped at one item.
 - Coming back to Canteiro after `keystatic.config.ts`, `canteiro.json` or the branch changed elsewhere reloads the site, so a form can't save a file in its old format.
 - A branch menu in the toolbar shows the branch Publish commits to and switches the site to another one, including branches only on GitHub. It won't switch while committed files have unpublished edits. Make a Staging Branch starts a `staging` branch from `main` and pushes it, for trying things on a preview before they go live.
